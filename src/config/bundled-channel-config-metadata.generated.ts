@@ -14966,6 +14966,11 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           type: "string",
           enum: ["pairing", "allowlist", "open", "disabled"],
         },
+        outboundPolicy: {
+          default: "open",
+          type: "string",
+          enum: ["open", "allowlist", "disabled"],
+        },
         selfChatMode: {
           type: "boolean",
         },
@@ -15218,6 +15223,10 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                 type: "string",
                 enum: ["pairing", "allowlist", "open", "disabled"],
               },
+              outboundPolicy: {
+                type: "string",
+                enum: ["open", "allowlist", "disabled"],
+              },
               selfChatMode: {
                 type: "boolean",
               },
@@ -15465,7 +15474,7 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           additionalProperties: false,
         },
       },
-      required: ["dmPolicy", "groupPolicy", "debounceMs", "mediaMaxMb"],
+      required: ["dmPolicy", "outboundPolicy", "groupPolicy", "debounceMs", "mediaMaxMb"],
       additionalProperties: false,
     },
     uiHints: {
@@ -15476,6 +15485,10 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       dmPolicy: {
         label: "WhatsApp DM Policy",
         help: 'Direct message access control ("pairing" recommended). "open" requires channels.whatsapp.allowFrom=["*"].',
+      },
+      outboundPolicy: {
+        label: "WhatsApp Outbound Policy",
+        help: 'Visible outbound WhatsApp activity policy. "allowlist" only sends visible output to direct chats listed in allowFrom; "disabled" keeps WhatsApp read-only.',
       },
       selfChatMode: {
         label: "WhatsApp Self-Phone Mode",

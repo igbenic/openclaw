@@ -71,6 +71,10 @@ type BundledChannelSecuritySurface = {
   unsupportedSecretRefSurfacePatterns?: readonly string[];
 };
 
+function cloneJsonValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function resolveChannelConfigSchemaModulePath(rootDir: string): string | null {
   const candidates = [
     path.join(rootDir, "src", "config-schema.ts"),
@@ -199,8 +203,10 @@ export async function collectBundledChannelConfigMetadata(params?: { repoRoot?: 
         channelId,
         ...(label ? { label } : {}),
         ...(description ? { description } : {}),
-        schema: surface.schema,
-        ...(Object.keys(surface.uiHints ?? {}).length > 0 ? { uiHints: surface.uiHints } : {}),
+        schema: cloneJsonValue(surface.schema),
+        ...(Object.keys(surface.uiHints ?? {}).length > 0
+          ? { uiHints: cloneJsonValue(surface.uiHints) }
+          : {}),
         ...(unsupportedSecretRefSurfacePatterns.length > 0
           ? { unsupportedSecretRefSurfacePatterns }
           : {}),

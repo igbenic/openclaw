@@ -33,6 +33,10 @@ type ChannelConfigSurface = {
 
 const jitiLoaders: PluginJitiLoaderCache = new Map();
 
+function cloneJsonValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function isBuiltChannelConfigSchema(value: unknown): value is ChannelConfigSurface {
   if (!value || typeof value !== "object") {
     return false;
@@ -150,7 +154,7 @@ export function collectBundledChannelConfigs(params: {
     }
 
     existingChannelConfigs[channelId] = {
-      schema: surface?.schema ?? existing?.schema ?? {},
+      schema: cloneJsonValue(surface?.schema ?? existing?.schema ?? {}),
       ...(uiHints && Object.keys(uiHints).length > 0 ? { uiHints } : {}),
       ...((surface?.runtime ?? existing?.runtime)
         ? { runtime: surface?.runtime ?? existing?.runtime }
