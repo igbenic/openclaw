@@ -137,3 +137,26 @@ describe('account dmPolicy="allowlist" uses inherited allowFrom', () => {
     );
   });
 });
+
+describe('WhatsApp outboundPolicy="allowlist" requires non-empty effective allowFrom', () => {
+  it('rejects root outboundPolicy="allowlist" without allowFrom', () => {
+    expectSchemaAllowlistIssue(WhatsAppConfigSchema, { outboundPolicy: "allowlist" }, "allowFrom");
+  });
+
+  it("accepts account outbound allowlist when parent allowFrom exists", () => {
+    expect(
+      WhatsAppConfigSchema.safeParse({
+        allowFrom: ["+15550001111"],
+        accounts: { work: { outboundPolicy: "allowlist" } },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects account outbound allowlist when neither account nor parent has allowFrom", () => {
+    expectSchemaAllowlistIssue(
+      WhatsAppConfigSchema,
+      { accounts: { work: { outboundPolicy: "allowlist" } } },
+      "allowFrom",
+    );
+  });
+});

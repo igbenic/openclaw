@@ -44,6 +44,7 @@ export type ExtensionChannelConfig = {
   /** Optional default account id when multiple accounts are configured. */
   defaultAccount?: string;
   dmPolicy?: string;
+  outboundPolicy?: string;
   groupPolicy?: GroupPolicy;
   contextVisibility?: ContextVisibilityMode;
   healthMonitor?: ChannelHealthMonitorConfig;

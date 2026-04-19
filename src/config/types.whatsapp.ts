@@ -20,6 +20,7 @@ export type WhatsAppActionConfig = {
 };
 
 export type WhatsAppReactionLevel = ReactionLevel;
+export type WhatsAppOutboundPolicy = "open" | "allowlist" | "disabled";
 
 export type WhatsAppGroupConfig = {
   requireMention?: boolean;
@@ -47,6 +48,13 @@ type WhatsAppSharedConfig = {
   enabled?: boolean;
   /** Direct message access policy (default: pairing). */
   dmPolicy?: DmPolicy;
+  /**
+   * Visible outbound activity policy:
+   * - "open": preserve normal outbound behavior
+   * - "allowlist": allow visible outbound activity only to direct chats in allowFrom
+   * - "disabled": keep WhatsApp read-only while still ingesting inbound messages
+   */
+  outboundPolicy?: WhatsAppOutboundPolicy;
   /** Same-phone setup (bot uses your personal WhatsApp number). */
   selfChatMode?: boolean;
   /** Optional allowlist for WhatsApp direct chats (E.164). */

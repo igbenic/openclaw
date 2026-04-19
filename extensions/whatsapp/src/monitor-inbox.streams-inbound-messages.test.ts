@@ -10,6 +10,7 @@ import {
   getAuthDir,
   getSock,
   installWebMonitorInboxUnitTestHooks,
+  mockLoadConfig,
   startInboxMonitor,
   waitForMessageCalls,
 } from "./monitor-inbox.test-harness.js";
@@ -191,6 +192,129 @@ describe("web monitor inbox", () => {
     });
 
     expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+
+    await listener.close();
+  });
+
+  it("stays unavailable on connect when outboundPolicy is not open", async () => {
+    mockLoadConfig.mockReturnValue({
+      channels: {
+        whatsapp: {
+          allowFrom: ["+999"],
+          outboundPolicy: "allowlist",
+        },
+      },
+      messages: {
+        messagePrefix: undefined,
+        responsePrefix: undefined,
+      },
+    });
+
+    const { listener, sock } = await startInboxMonitor(vi.fn(async () => {}) as InboxOnMessage);
+
+    expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+
+    await listener.close();
+  });
+
+  it("allows allowlisted DM visible outbound activity in outbound allowlist mode", async () => {
+    mockLoadConfig.mockReturnValue({
+      channels: {
+        whatsapp: {
+          allowFrom: ["+999"],
+          outboundPolicy: "allowlist",
+        },
+      },
+      messages: {
+        messagePrefix: undefined,
+        responsePrefix: undefined,
+      },
+    });
+    const onMessage = vi.fn(async (msg) => {
+      await msg.sendComposing();
+      await msg.reply("pong");
+    });
+
+    const { listener, sock } = await startInboxMonitor(onMessage as InboxOnMessage);
+    const messageId = nextMessageId("allowlist-dm");
+    sock.ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: messageId,
+        remoteJid: "999@s.whatsapp.net",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibleOutboundAllowed: true,
+        visibleOutboundPolicy: "allowlist",
+      }),
+    );
+    expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+    expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("composing", "999@s.whatsapp.net");
+    expect(sock.readMessages).toHaveBeenCalledWith([
+      {
+        remoteJid: "999@s.whatsapp.net",
+        id: messageId,
+        participant: undefined,
+        fromMe: false,
+      },
+    ]);
+    expect(sock.sendMessage).toHaveBeenCalledWith("999@s.whatsapp.net", { text: "pong" });
+
+    await listener.close();
+  });
+
+  it("suppresses group visible outbound activity in outbound allowlist mode", async () => {
+    mockLoadConfig.mockReturnValue({
+      channels: {
+        whatsapp: {
+          allowFrom: ["+999"],
+          outboundPolicy: "allowlist",
+          groupPolicy: "open",
+        },
+      },
+      messages: {
+        messagePrefix: undefined,
+        responsePrefix: undefined,
+      },
+    });
+    const onMessage = vi.fn(async (msg) => {
+      await msg.sendComposing();
+      await msg.reply("pong");
+    });
+
+    const { listener, sock } = await startInboxMonitor(onMessage as InboxOnMessage);
+    const messageId = nextMessageId("allowlist-group");
+    sock.ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: messageId,
+        remoteJid: "12345@g.us",
+        participant: "999@s.whatsapp.net",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chatType: "group",
+        visibleOutboundAllowed: false,
+        visibleOutboundPolicy: "allowlist",
+      }),
+    );
+    expect(sock.sendPresenceUpdate).toHaveBeenCalledTimes(1);
+    expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+    expect(sock.readMessages).not.toHaveBeenCalled();
+    expect(sock.sendMessage).not.toHaveBeenCalled();
 
     await listener.close();
   });

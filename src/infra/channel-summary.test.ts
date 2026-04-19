@@ -75,6 +75,7 @@ function makeTelegramSummaryPlugin(params: {
   statusState?: string;
   authAgeMs?: number;
   allowFrom?: string[];
+  outboundPolicy?: string;
 }): ChannelPlugin {
   const getAccount = () => ({
     accountId: "primary",
@@ -84,6 +85,7 @@ function makeTelegramSummaryPlugin(params: {
     linked: params.linked,
     allowFrom: params.allowFrom ?? [],
     dmPolicy: "mutuals",
+    outboundPolicy: params.outboundPolicy,
     tokenSource: "env",
   });
 
@@ -255,6 +257,30 @@ describe("buildChannelSummary", () => {
 
     expect(lines).toContain("Telegram: linked +15551234567 auth 5m ago");
     expect(lines).toContain("  - primary (Main Bot) (dm:mutuals, token:env, allow:alice,bob)");
+  });
+
+  it("includes outbound policy details when present", async () => {
+    setActivePluginRegistry(
+      createTestRegistry([
+        {
+          pluginId: "telegram",
+          plugin: makeTelegramSummaryPlugin({
+            enabled: true,
+            configured: true,
+            linked: true,
+            outboundPolicy: "allowlist",
+          }),
+          source: "test",
+        },
+      ]),
+    );
+
+    const lines = await buildChannelSummary({ channels: {} } as never, {
+      colorize: false,
+      includeAllowFrom: false,
+    });
+
+    expect(lines).toContain("  - primary (Main Bot) (dm:mutuals, outbound:allowlist, token:env)");
   });
 
   it("shows not-linked status when linked metadata is explicitly false", async () => {

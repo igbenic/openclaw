@@ -65,6 +65,9 @@ export type WebInboundMessage = {
   selfLid?: string | null;
   selfE164?: string | null;
   fromMe?: boolean;
+  visibleOutboundAllowed?: boolean;
+  visibleOutboundPolicy?: string;
+  visibleOutboundBlockReason?: string;
   location?: NormalizedLocation;
   sendComposing: () => Promise<void>;
   reply: (text: string) => Promise<void>;

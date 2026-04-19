@@ -76,6 +76,9 @@ export function formatGatewayChannelsStatusLines(payload: Record<string, unknown
       if (typeof account.dmPolicy === "string" && account.dmPolicy.length > 0) {
         bits.push(`dm:${account.dmPolicy}`);
       }
+      if (typeof account.outboundPolicy === "string" && account.outboundPolicy.length > 0) {
+        bits.push(`outbound:${account.outboundPolicy}`);
+      }
       if (Array.isArray(account.allowFrom) && account.allowFrom.length > 0) {
         bits.push(`allow:${account.allowFrom.slice(0, 2).join(",")}`);
       }

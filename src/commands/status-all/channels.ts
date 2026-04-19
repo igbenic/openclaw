@@ -140,6 +140,9 @@ const buildAccountNotes = (params: {
   if (snapshot.dmPolicy) {
     notes.push(`dm:${snapshot.dmPolicy}`);
   }
+  if (snapshot.outboundPolicy) {
+    notes.push(`outbound:${snapshot.outboundPolicy}`);
+  }
   if (snapshot.tokenSource && snapshot.tokenSource !== "none") {
     notes.push(`token:${snapshot.tokenSource}`);
   }

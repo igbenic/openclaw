@@ -15,6 +15,7 @@ import {
 import { getRegisteredWhatsAppConnectionController } from "./connection-controller-registry.js";
 import type { ActiveWebListener, ActiveWebSendOptions } from "./inbound/types.js";
 import { loadOutboundMediaFromUrl } from "./outbound-media.runtime.js";
+import { assertWhatsAppVisibleOutboundAllowed } from "./outbound-policy.js";
 import { markdownToWhatsApp, toWhatsappJid } from "./text-runtime.js";
 
 const outboundLog = createSubsystemLogger("gateway/channels/whatsapp").child("outbound");
@@ -85,6 +86,11 @@ export async function sendMessageWhatsApp(
   const account = resolveWhatsAppAccount({
     cfg,
     accountId: resolvedAccountId ?? options.accountId,
+  });
+  assertWhatsAppVisibleOutboundAllowed({
+    account,
+    target: to,
+    action: "message send",
   });
   const tableMode = resolveMarkdownTableMode({
     cfg,
@@ -170,13 +176,23 @@ export async function sendReactionWhatsApp(
     fromMe?: boolean;
     participant?: string;
     accountId?: string;
+    cfg?: OpenClawConfig;
   },
 ): Promise<void> {
   const correlationId = generateSecureUuid();
-  const cfg = loadConfig();
-  const { listener: active } = requireOutboundActiveWebListener({
+  const cfg = options.cfg ?? loadConfig();
+  const { listener: active, accountId: resolvedAccountId } = requireOutboundActiveWebListener({
     cfg,
     accountId: options.accountId,
+  });
+  const account = resolveWhatsAppAccount({
+    cfg,
+    accountId: resolvedAccountId ?? options.accountId,
+  });
+  assertWhatsAppVisibleOutboundAllowed({
+    account,
+    target: chatJid,
+    action: "reaction send",
   });
   const redactedChatJid = redactIdentifier(chatJid);
   const logger = getChildLogger({
@@ -216,9 +232,18 @@ export async function sendPollWhatsApp(
   const correlationId = generateSecureUuid();
   const startedAt = Date.now();
   const cfg = options.cfg ?? loadConfig();
-  const { listener: active } = requireOutboundActiveWebListener({
+  const { listener: active, accountId: resolvedAccountId } = requireOutboundActiveWebListener({
     cfg,
     accountId: options.accountId,
+  });
+  const account = resolveWhatsAppAccount({
+    cfg,
+    accountId: resolvedAccountId ?? options.accountId,
+  });
+  assertWhatsAppVisibleOutboundAllowed({
+    account,
+    target: to,
+    action: "poll send",
   });
   const redactedTo = redactIdentifier(to);
   const logger = getChildLogger({

@@ -22,6 +22,12 @@ export async function maybeSendAckReaction(params: {
   if (!params.msg.id) {
     return;
   }
+  if (params.msg.visibleOutboundAllowed === false) {
+    logVerbose(
+      `WhatsApp ack reaction skipped for chat ${params.msg.chatId}: ${params.msg.visibleOutboundBlockReason ?? "visible outbound activity is blocked."}`,
+    );
+    return;
+  }
 
   // Keep ackReaction as the emoji/scope control, while letting reactionLevel
   // suppress all automatic reactions when it is explicitly set to "off".

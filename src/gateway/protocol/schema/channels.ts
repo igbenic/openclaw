@@ -136,6 +136,7 @@ export const ChannelAccountSnapshotSchema = Type.Object(
     lastProbeAt: Type.Optional(Type.Integer({ minimum: 0 })),
     mode: Type.Optional(Type.String()),
     dmPolicy: Type.Optional(Type.String()),
+    outboundPolicy: Type.Optional(Type.String()),
     allowFrom: Type.Optional(Type.Array(Type.String())),
     tokenSource: Type.Optional(Type.String()),
     botTokenSource: Type.Optional(Type.String()),

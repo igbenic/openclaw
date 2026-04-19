@@ -91,6 +91,45 @@ describe("checkInboundAccessControl pairing grace", () => {
     expect(upsertPairingRequestMock).toHaveBeenCalled();
     expect(sendMessageMock).toHaveBeenCalled();
   });
+
+  it("suppresses pairing replies when outboundPolicy disables visible outbound activity", async () => {
+    setAccessControlTestConfig({
+      channels: {
+        whatsapp: {
+          dmPolicy: "pairing",
+          outboundPolicy: "disabled",
+        },
+      },
+    });
+
+    const result = await runPairingGraceCase(1_000_000 - 10_000);
+
+    expect(result.allowed).toBe(false);
+    expect(result.visibleOutboundAllowed).toBe(false);
+    expect(result.outboundPolicy).toBe("disabled");
+    expect(upsertPairingRequestMock).not.toHaveBeenCalled();
+    expect(sendMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("suppresses pairing replies when outboundPolicy allowlists a different DM target", async () => {
+    setAccessControlTestConfig({
+      channels: {
+        whatsapp: {
+          dmPolicy: "pairing",
+          outboundPolicy: "allowlist",
+          allowFrom: ["+15550002222"],
+        },
+      },
+    });
+
+    const result = await runPairingGraceCase(1_000_000 - 10_000);
+
+    expect(result.allowed).toBe(false);
+    expect(result.visibleOutboundAllowed).toBe(false);
+    expect(result.outboundPolicy).toBe("allowlist");
+    expect(upsertPairingRequestMock).not.toHaveBeenCalled();
+    expect(sendMessageMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("WhatsApp dmPolicy precedence", () => {

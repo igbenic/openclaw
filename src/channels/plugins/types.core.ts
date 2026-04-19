@@ -209,6 +209,7 @@ export type ChannelAccountSnapshot = {
   lastRunActivityAt?: number | null;
   mode?: string;
   dmPolicy?: string;
+  outboundPolicy?: string;
   allowFrom?: string[];
   tokenSource?: string;
   botTokenSource?: string;

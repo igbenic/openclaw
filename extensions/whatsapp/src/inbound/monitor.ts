@@ -1,11 +1,16 @@
 import type { AnyMessageContent, proto, WAMessage, WASocket } from "@whiskeysockets/baileys";
 import { createInboundDebouncer, formatLocationText } from "openclaw/plugin-sdk/channel-inbound";
+import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
 import { recordChannelActivity } from "openclaw/plugin-sdk/infra-runtime";
 import { defaultRuntime } from "openclaw/plugin-sdk/runtime-env";
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import { getChildLogger } from "openclaw/plugin-sdk/text-runtime";
 import { readWebSelfIdentityForDecision, WhatsAppAuthUnstableError } from "../auth-store.js";
 import { getPrimaryIdentityId, resolveComparableIdentity } from "../identity.js";
+import {
+  assertWhatsAppVisibleOutboundAllowed,
+  resolveWhatsAppVisibleOutboundDecision,
+} from "../outbound-policy.js";
 import { DEFAULT_RECONNECT_POLICY, computeBackoff, sleepWithAbort } from "../reconnect.js";
 import { createWaSocket, formatError, getStatusCode, waitForWaConnection } from "../session.js";
 import { resolveJidToE164 } from "../text-runtime.js";
@@ -119,7 +124,25 @@ export async function attachWebInboxToSocket(
     onCloseResolve = null;
     resolver(reason);
   };
-  const presence = options.selfChatMode ? "unavailable" : "available";
+  const startupPresenceAllowed = resolveVisibleOutboundDecision().allowed;
+  const presence = options.selfChatMode || !startupPresenceAllowed ? "unavailable" : "available";
+
+  function resolveVisibleOutboundDecision(target?: string | null) {
+    return resolveWhatsAppVisibleOutboundDecision({
+      cfg: loadConfig(),
+      accountId: options.accountId,
+      target,
+    });
+  }
+
+  function assertVisibleOutboundAllowed(params: { target: string; action: string }) {
+    return assertWhatsAppVisibleOutboundAllowed({
+      cfg: loadConfig(),
+      accountId: options.accountId,
+      target: params.target,
+      action: params.action,
+    });
+  }
 
   try {
     await sock.sendPresenceUpdate(presence);
@@ -418,7 +441,7 @@ export async function attachWebInboxToSocket(
 
   const maybeMarkInboundAsRead = async (inbound: NormalizedInboundMessage) => {
     const { id, remoteJid, participantJid, access } = inbound;
-    if (id && !access.isSelfChat && options.sendReadReceipts !== false) {
+    if (id && access.shouldMarkRead && options.sendReadReceipts !== false) {
       try {
         await sock.readMessages([{ remoteJid, id, participant: participantJid, fromMe: false }]);
         const suffix = participantJid ? ` (participant ${participantJid})` : "";
@@ -432,6 +455,11 @@ export async function attachWebInboxToSocket(
     } else if (id && access.isSelfChat && options.verbose) {
       // Self-chat mode: never auto-send read receipts (blue ticks) on behalf of the owner.
       logWhatsAppVerbose(options.verbose, `Self-chat mode: skipping read receipt for ${id}`);
+    } else if (id && !access.visibleOutboundAllowed) {
+      logWhatsAppVerbose(
+        options.verbose,
+        `Skipping read receipt for ${id}: ${access.visibleOutboundBlockReason ?? "visible outbound activity is blocked."}`,
+      );
     }
   };
 
@@ -501,7 +529,20 @@ export async function attachWebInboxToSocket(
     enriched: EnrichedInboundMessage,
   ) => {
     const chatJid = inbound.remoteJid;
+    const skipVisibleOutbound = (action: string): boolean => {
+      if (inbound.access.visibleOutboundAllowed) {
+        return false;
+      }
+      logWhatsAppVerbose(
+        options.verbose,
+        `Skipping ${action} for ${chatJid}: ${inbound.access.visibleOutboundBlockReason ?? "visible outbound activity is blocked."}`,
+      );
+      return true;
+    };
     const sendComposing = async () => {
+      if (skipVisibleOutbound("composing signal")) {
+        return;
+      }
       const currentSock = getCurrentSock();
       if (!currentSock) {
         return;
@@ -513,9 +554,15 @@ export async function attachWebInboxToSocket(
       }
     };
     const reply = async (text: string) => {
+      if (skipVisibleOutbound("auto-reply")) {
+        return;
+      }
       await sendTrackedMessage(chatJid, { text });
     };
     const sendMedia = async (payload: AnyMessageContent) => {
+      if (skipVisibleOutbound("media reply")) {
+        return;
+      }
       await sendTrackedMessage(chatJid, payload);
     };
     const timestamp = inbound.messageTimestampMs;
@@ -568,6 +615,9 @@ export async function attachWebInboxToSocket(
       selfLid: self.lid ?? undefined,
       selfE164: self.e164 ?? undefined,
       fromMe: Boolean(msg.key?.fromMe),
+      visibleOutboundAllowed: inbound.access.visibleOutboundAllowed,
+      visibleOutboundPolicy: inbound.access.outboundPolicy,
+      visibleOutboundBlockReason: inbound.access.visibleOutboundBlockReason,
       location: enriched.location ?? undefined,
       sendComposing,
       reply,
@@ -699,6 +749,9 @@ export async function attachWebInboxToSocket(
       },
     },
     defaultAccountId: options.accountId,
+    beforeSend: async ({ action, target }) => {
+      assertVisibleOutboundAllowed({ target, action });
+    },
   });
 
   return {

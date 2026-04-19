@@ -23,6 +23,10 @@ export function createWebSendApi(params: {
     sendPresenceUpdate: (presence: WAPresence, jid?: string) => Promise<unknown>;
   };
   defaultAccountId: string;
+  beforeSend?: (params: {
+    action: "message send" | "poll send" | "reaction send" | "composing signal";
+    target: string;
+  }) => void | Promise<void>;
 }) {
   return {
     sendMessage: async (
@@ -33,6 +37,7 @@ export function createWebSendApi(params: {
       sendOptions?: ActiveWebSendOptions,
     ): Promise<{ messageId: string }> => {
       const jid = toWhatsappJid(to);
+      await params.beforeSend?.({ action: "message send", target: to });
       let payload: AnyMessageContent;
       if (mediaBuffer) {
         mediaType ??= "application/octet-stream";
@@ -77,6 +82,7 @@ export function createWebSendApi(params: {
       poll: { question: string; options: string[]; maxSelections?: number },
     ): Promise<{ messageId: string }> => {
       const jid = toWhatsappJid(to);
+      await params.beforeSend?.({ action: "poll send", target: to });
       const result = await params.sock.sendMessage(jid, {
         poll: {
           name: poll.question,
@@ -96,6 +102,7 @@ export function createWebSendApi(params: {
       participant?: string,
     ): Promise<void> => {
       const jid = toWhatsappJid(chatJid);
+      await params.beforeSend?.({ action: "reaction send", target: chatJid });
       await params.sock.sendMessage(jid, {
         react: {
           text: emoji,
@@ -110,6 +117,7 @@ export function createWebSendApi(params: {
     },
     sendComposingTo: async (to: string): Promise<void> => {
       const jid = toWhatsappJid(to);
+      await params.beforeSend?.({ action: "composing signal", target: to });
       await params.sock.sendPresenceUpdate("composing", jid);
     },
   } as const;

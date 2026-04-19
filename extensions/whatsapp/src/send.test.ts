@@ -174,6 +174,72 @@ describe("web outbound", () => {
     ).rejects.toThrow(/account: work/);
   });
 
+  it("blocks visible outbound messages when outboundPolicy is disabled", async () => {
+    await expect(
+      sendMessageWhatsApp("+1555", "hi", {
+        verbose: false,
+        cfg: {
+          channels: {
+            whatsapp: {
+              outboundPolicy: "disabled",
+            },
+          },
+        } as OpenClawConfig,
+      }),
+    ).rejects.toThrow(/visible outbound .* disabled/i);
+
+    expect(sendComposingTo).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("blocks polls and reactions when outboundPolicy is disabled", async () => {
+    const cfg = {
+      channels: {
+        whatsapp: {
+          outboundPolicy: "disabled",
+        },
+      },
+    } as OpenClawConfig;
+
+    await expect(
+      sendPollWhatsApp(
+        "+1555",
+        { question: "Lunch?", options: ["Pizza"] },
+        { verbose: false, cfg },
+      ),
+    ).rejects.toThrow(/visible outbound .* disabled/i);
+    await expect(
+      sendReactionWhatsApp("1555@s.whatsapp.net", "msg123", "✅", {
+        verbose: false,
+        fromMe: false,
+        accountId: "default",
+        cfg,
+      }),
+    ).rejects.toThrow(/visible outbound .* disabled/i);
+
+    expect(sendPoll).not.toHaveBeenCalled();
+    expect(sendReaction).not.toHaveBeenCalled();
+  });
+
+  it("allows allowlisted direct chats but blocks groups in outbound allowlist mode", async () => {
+    const cfg = {
+      channels: {
+        whatsapp: {
+          outboundPolicy: "allowlist",
+          allowFrom: ["+1555"],
+        },
+      },
+    } as OpenClawConfig;
+
+    await sendMessageWhatsApp("+1555", "hi", { verbose: false, cfg });
+    await expect(
+      sendMessageWhatsApp("12345@g.us", "group", { verbose: false, cfg }),
+    ).rejects.toThrow(/group chats stay read-only/i);
+
+    expect(sendComposingTo).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("maps audio to PTT with opus mime when ogg", async () => {
     const buf = Buffer.from("audio");
     loadWebMediaMock.mockResolvedValueOnce({

@@ -62,6 +62,9 @@ const buildAccountDetails = (params: {
   if (snapshot.dmPolicy) {
     details.push(`dm:${snapshot.dmPolicy}`);
   }
+  if (snapshot.outboundPolicy) {
+    details.push(`outbound:${snapshot.outboundPolicy}`);
+  }
   if (snapshot.tokenSource && snapshot.tokenSource !== "none") {
     details.push(`token:${snapshot.tokenSource}`);
   }

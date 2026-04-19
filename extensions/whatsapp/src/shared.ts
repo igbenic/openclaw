@@ -226,6 +226,7 @@ export function createWhatsAppPluginBase(params: {
           extra: {
             linked: Boolean(account.authDir),
             dmPolicy: account.dmPolicy,
+            outboundPolicy: account.outboundPolicy,
             allowFrom: account.allowFrom,
           },
         }),

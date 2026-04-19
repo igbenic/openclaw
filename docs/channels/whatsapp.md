@@ -46,6 +46,7 @@ openclaw plugins install @openclaw/whatsapp
   channels: {
     whatsapp: {
       dmPolicy: "pairing",
+      outboundPolicy: "allowlist",
       allowFrom: ["+15551234567"],
       groupPolicy: "allowlist",
       groupAllowFrom: ["+15551234567"],
@@ -167,6 +168,33 @@ OpenClaw recommends running WhatsApp on a separate number when possible. (The ch
     - pairings are persisted in channel allow-store and merged with configured `allowFrom`
     - if no allowlist is configured, the linked self number is allowed by default
     - outbound `fromMe` DMs are never auto-paired
+
+  </Tab>
+
+  <Tab title="Visible outbound policy">
+    `channels.whatsapp.outboundPolicy` controls what visible WhatsApp activity OpenClaw may emit after inbound messages are accepted:
+
+    - `open` (default): preserve normal behavior
+    - `allowlist`: allow visible outbound activity only to direct chats in `allowFrom`
+    - `disabled`: never emit visible outbound activity
+
+    Visible outbound activity includes:
+
+    - replies and media sends
+    - polls and reactions
+    - pairing replies
+    - typing/composing indicators
+    - read receipts
+    - startup presence advertising
+
+    Behavior notes:
+
+    - `allowlist` keeps group chats read-only even if inbound group messages are allowed
+    - `allowlist` reuses `allowFrom`; `["*"]` allows all direct chats while still silencing groups
+    - `allowlist` requires a non-empty effective `allowFrom`
+    - blocked automatic writes are suppressed with verbose logs; explicit sends fail fast
+
+    Multi-account override: `channels.whatsapp.accounts.<id>.outboundPolicy`.
 
   </Tab>
 
@@ -378,6 +406,7 @@ Ack reactions are gated by `reactionLevel` — they are suppressed when `reactio
 Behavior notes:
 
 - sent immediately after inbound is accepted (pre-reply)
+- suppressed automatically when `outboundPolicy` blocks visible outbound activity for that chat
 - failures are logged but do not block normal reply delivery
 - group mode `mentions` reacts on mention-triggered turns; group activation `always` acts as bypass for this check
 - WhatsApp uses `channels.whatsapp.ackReaction` (legacy `messages.ackReaction` is not used here)
@@ -474,6 +503,7 @@ Primary reference:
 High-signal WhatsApp fields:
 
 - access: `dmPolicy`, `allowFrom`, `groupPolicy`, `groupAllowFrom`, `groups`
+- visible outbound: `outboundPolicy`
 - delivery: `textChunkLimit`, `chunkMode`, `mediaMaxMb`, `sendReadReceipts`, `ackReaction`, `reactionLevel`
 - multi-account: `accounts.<id>.enabled`, `accounts.<id>.authDir`, account-level overrides
 - operations: `configWrites`, `debounceMs`, `web.enabled`, `web.heartbeatSeconds`, `web.reconnect.*`

@@ -9,6 +9,10 @@ export const whatsAppChannelConfigUiHints = {
     label: "WhatsApp DM Policy",
     help: 'Direct message access control ("pairing" recommended). "open" requires channels.whatsapp.allowFrom=["*"].',
   },
+  outboundPolicy: {
+    label: "WhatsApp Outbound Policy",
+    help: 'Visible outbound WhatsApp activity policy. "allowlist" only sends visible output to direct chats listed in allowFrom; "disabled" keeps WhatsApp read-only.',
+  },
   selfChatMode: {
     label: "WhatsApp Self-Phone Mode",
     help: "Same-phone setup (bot uses your personal WhatsApp number).",

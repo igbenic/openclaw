@@ -50,6 +50,12 @@ export async function deliverWebReply(params: {
     whatsappOutboundLog.debug(`Suppressed reasoning payload to ${msg.from}`);
     return;
   }
+  if (msg.visibleOutboundAllowed === false) {
+    whatsappOutboundLog.debug(
+      `Skipped visible reply to ${msg.from}: ${msg.visibleOutboundBlockReason ?? "visible outbound activity is blocked."}`,
+    );
+    return;
+  }
   const tableMode = params.tableMode ?? "code";
   const chunkMode = params.chunkMode ?? "length";
   const convertedText = markdownToWhatsApp(

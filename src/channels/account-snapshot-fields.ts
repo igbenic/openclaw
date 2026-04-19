@@ -165,6 +165,7 @@ export function projectSafeChannelAccountSnapshotFields(
   const healthState = normalizeOptionalString(record.healthState);
   const mode = normalizeOptionalString(record.mode);
   const dmPolicy = normalizeOptionalString(record.dmPolicy);
+  const outboundPolicy = normalizeOptionalString(record.outboundPolicy);
   const baseUrl = normalizeOptionalString(record.baseUrl);
   const cliPath = normalizeOptionalString(record.cliPath);
   const dbPath = normalizeOptionalString(record.dbPath);
@@ -189,6 +190,7 @@ export function projectSafeChannelAccountSnapshotFields(
     ...(healthState ? { healthState } : {}),
     ...(mode ? { mode } : {}),
     ...(dmPolicy ? { dmPolicy } : {}),
+    ...(outboundPolicy ? { outboundPolicy } : {}),
     ...(readStringArray(record, "allowFrom")
       ? { allowFrom: readStringArray(record, "allowFrom") }
       : {}),

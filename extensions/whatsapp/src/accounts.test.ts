@@ -80,6 +80,7 @@ describe("resolveWhatsAppAuthDir", () => {
             accounts: {
               default: {
                 dmPolicy: "allowlist",
+                outboundPolicy: "allowlist",
                 allowFrom: ["+15550001111"],
                 groupPolicy: "open",
                 groupAllowFrom: ["+15550002222"],
@@ -99,6 +100,7 @@ describe("resolveWhatsAppAuthDir", () => {
     });
 
     expect(resolved.dmPolicy).toBe("allowlist");
+    expect(resolved.outboundPolicy).toBe("allowlist");
     expect(resolved.allowFrom).toEqual(["+15550001111"]);
     expect(resolved.groupPolicy).toBe("open");
     expect(resolved.groupAllowFrom).toEqual(["+15550002222"]);
@@ -114,17 +116,20 @@ describe("resolveWhatsAppAuthDir", () => {
         channels: {
           whatsapp: {
             dmPolicy: "open",
+            outboundPolicy: "open",
             allowFrom: ["*"],
             groupPolicy: "disabled",
             accounts: {
               default: {
                 dmPolicy: "allowlist",
+                outboundPolicy: "allowlist",
                 allowFrom: ["+15550001111"],
                 groupPolicy: "open",
               },
               work: {
                 authDir: "/tmp/work",
                 dmPolicy: "pairing",
+                outboundPolicy: "disabled",
               },
             },
           },
@@ -134,6 +139,7 @@ describe("resolveWhatsAppAuthDir", () => {
     });
 
     expect(resolved.dmPolicy).toBe("pairing");
+    expect(resolved.outboundPolicy).toBe("disabled");
     expect(resolved.allowFrom).toEqual(["+15550001111"]);
     expect(resolved.groupPolicy).toBe("open");
   });

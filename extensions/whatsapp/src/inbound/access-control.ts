@@ -8,12 +8,16 @@ import {
   resolveDmGroupAccessWithLists,
 } from "openclaw/plugin-sdk/security-runtime";
 import { resolveWhatsAppInboundPolicy } from "../inbound-policy.js";
+import { resolveWhatsAppVisibleOutboundDecision } from "../outbound-policy.js";
 
 export type InboundAccessControlResult = {
   allowed: boolean;
   shouldMarkRead: boolean;
   isSelfChat: boolean;
   resolvedAccountId: string;
+  visibleOutboundAllowed: boolean;
+  outboundPolicy: string;
+  visibleOutboundBlockReason?: string;
 };
 
 const PAIRING_REPLY_HISTORY_GRACE_MS = 30_000;
@@ -62,6 +66,19 @@ export async function checkInboundAccessControl(params: {
     typeof params.connectedAtMs === "number" &&
     typeof params.messageTimestampMs === "number" &&
     params.messageTimestampMs < params.connectedAtMs - pairingGraceMs;
+  const visibleOutbound = resolveWhatsAppVisibleOutboundDecision({
+    account: policy.account,
+    target: params.remoteJid,
+  });
+  const buildResult = (overrides: Pick<InboundAccessControlResult, "allowed" | "shouldMarkRead">) =>
+    ({
+      ...overrides,
+      isSelfChat: policy.isSelfChat,
+      resolvedAccountId: policy.account.accountId,
+      visibleOutboundAllowed: visibleOutbound.allowed,
+      outboundPolicy: visibleOutbound.outboundPolicy,
+      ...(!visibleOutbound.allowed ? { visibleOutboundBlockReason: visibleOutbound.reason } : {}),
+    }) satisfies InboundAccessControlResult;
 
   // Group policy filtering:
   // - "open": groups bypass allowFrom, only mention-gating applies
@@ -100,33 +117,18 @@ export async function checkInboundAccessControl(params: {
         `Blocked group message from ${params.senderE164 ?? "unknown sender"} (groupPolicy: allowlist)`,
       );
     }
-    return {
-      allowed: false,
-      shouldMarkRead: false,
-      isSelfChat: policy.isSelfChat,
-      resolvedAccountId: policy.account.accountId,
-    };
+    return buildResult({ allowed: false, shouldMarkRead: false });
   }
 
   // DM access control (secure defaults): "pairing" (default) / "allowlist" / "open" / "disabled".
   if (!params.group) {
     if (params.isFromMe && !policy.isSamePhone(params.from)) {
       logWhatsAppVerbose(params.verbose, "Skipping outbound DM (fromMe); no pairing reply needed.");
-      return {
-        allowed: false,
-        shouldMarkRead: false,
-        isSelfChat: policy.isSelfChat,
-        resolvedAccountId: policy.account.accountId,
-      };
+      return buildResult({ allowed: false, shouldMarkRead: false });
     }
     if (access.decision === "block" && access.reason === "dmPolicy=disabled") {
       logWhatsAppVerbose(params.verbose, "Blocked dm (dmPolicy: disabled)");
-      return {
-        allowed: false,
-        shouldMarkRead: false,
-        isSelfChat: policy.isSelfChat,
-        resolvedAccountId: policy.account.accountId,
-      };
+      return buildResult({ allowed: false, shouldMarkRead: false });
     }
     if (access.decision === "pairing" && !policy.isSamePhone(params.from)) {
       const candidate = params.from;
@@ -134,6 +136,11 @@ export async function checkInboundAccessControl(params: {
         logWhatsAppVerbose(
           params.verbose,
           `Skipping pairing reply for historical DM from ${candidate}.`,
+        );
+      } else if (!visibleOutbound.allowed) {
+        logWhatsAppVerbose(
+          params.verbose,
+          `Skipping pairing reply for ${candidate}: ${visibleOutbound.reason}`,
         );
       } else {
         await createChannelPairingChallengeIssuer({
@@ -166,33 +173,21 @@ export async function checkInboundAccessControl(params: {
           },
         });
       }
-      return {
-        allowed: false,
-        shouldMarkRead: false,
-        isSelfChat: policy.isSelfChat,
-        resolvedAccountId: policy.account.accountId,
-      };
+      return buildResult({ allowed: false, shouldMarkRead: false });
     }
     if (access.decision !== "allow") {
       logWhatsAppVerbose(
         params.verbose,
         `Blocked unauthorized sender ${params.from} (dmPolicy=${policy.dmPolicy})`,
       );
-      return {
-        allowed: false,
-        shouldMarkRead: false,
-        isSelfChat: policy.isSelfChat,
-        resolvedAccountId: policy.account.accountId,
-      };
+      return buildResult({ allowed: false, shouldMarkRead: false });
     }
   }
 
-  return {
+  return buildResult({
     allowed: true,
-    shouldMarkRead: true,
-    isSelfChat: policy.isSelfChat,
-    resolvedAccountId: policy.account.accountId,
-  };
+    shouldMarkRead: visibleOutbound.allowed,
+  });
 }
 
 export const __testing = {

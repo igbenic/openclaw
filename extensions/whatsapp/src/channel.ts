@@ -263,6 +263,7 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> =
               lastEventAt: runtime?.lastEventAt ?? null,
               healthState: runtime?.healthState ?? undefined,
               dmPolicy: account.dmPolicy,
+              outboundPolicy: account.outboundPolicy,
               allowFrom: account.allowFrom,
             },
           };
