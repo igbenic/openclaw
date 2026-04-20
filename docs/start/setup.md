@@ -54,6 +54,39 @@ After `pnpm build`, you can run the packaged CLI directly:
 node openclaw.mjs gateway --port 18789 --verbose
 ```
 
+## Use this checkout as the default CLI
+
+If you want the plain `openclaw` command on this machine to resolve to your fork instead of a
+published package, build the checkout and link it globally:
+
+```bash
+pnpm install
+pnpm build
+pnpm ui:build
+npm link
+openclaw --version
+```
+
+`npm link` creates a global symlink to the current checkout, so the default `openclaw`
+command now runs this repo's `openclaw.mjs`. Your OpenClaw state still lives outside the
+repo in `~/.openclaw/openclaw.json` and `~/.openclaw/workspace`.
+
+After source edits, rebuild before using the packaged CLI again:
+
+```bash
+pnpm build
+pnpm ui:build
+```
+
+If a gateway or daemon is already running, restart it after linking so the live process picks
+up the linked checkout.
+
+To switch back to a published release later:
+
+```bash
+npm install -g openclaw@latest
+```
+
 ## Stable workflow (macOS app first)
 
 1. Install + launch **OpenClaw.app** (menu bar).
