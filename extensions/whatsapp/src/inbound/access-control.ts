@@ -68,7 +68,9 @@ export async function checkInboundAccessControl(params: {
     params.messageTimestampMs < params.connectedAtMs - pairingGraceMs;
   const visibleOutbound = resolveWhatsAppVisibleOutboundDecision({
     account: policy.account,
-    target: params.remoteJid,
+    // For direct chats, prefer the resolved phone identity over the raw remote JID so
+    // LID/device JIDs still honor the same allowFrom entries as the inbound route.
+    target: params.group ? params.remoteJid : params.from,
   });
   const buildResult = (overrides: Pick<InboundAccessControlResult, "allowed" | "shouldMarkRead">) =>
     ({

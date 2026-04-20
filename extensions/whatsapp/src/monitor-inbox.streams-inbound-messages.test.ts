@@ -270,6 +270,61 @@ describe("web monitor inbox", () => {
     await listener.close();
   });
 
+  it("allows allowlisted self-chat visible outbound activity when the raw DM target is a LID", async () => {
+    mockLoadConfig.mockReturnValue({
+      channels: {
+        whatsapp: {
+          allowFrom: ["+123"],
+          outboundPolicy: "allowlist",
+        },
+      },
+      messages: {
+        messagePrefix: undefined,
+        responsePrefix: undefined,
+      },
+    });
+    const onMessage = vi.fn(async (msg) => {
+      await msg.sendComposing();
+      await msg.reply("pong");
+    });
+
+    const { listener, sock } = await startInboxMonitor(onMessage as InboxOnMessage);
+    sock.signalRepository.lidMapping.getPNForLID.mockResolvedValueOnce("123@s.whatsapp.net");
+    const messageId = nextMessageId("allowlist-lid-self");
+    sock.ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: messageId,
+        remoteJid: "777@lid",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "+123",
+        visibleOutboundAllowed: true,
+        visibleOutboundPolicy: "allowlist",
+      }),
+    );
+    expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+    expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("composing", "777@lid");
+    expect(sock.readMessages).toHaveBeenCalledWith([
+      {
+        remoteJid: "777@lid",
+        id: messageId,
+        participant: undefined,
+        fromMe: false,
+      },
+    ]);
+    expect(sock.sendMessage).toHaveBeenCalledWith("777@lid", { text: "pong" });
+
+    await listener.close();
+  });
+
   it("suppresses group visible outbound activity in outbound allowlist mode", async () => {
     mockLoadConfig.mockReturnValue({
       channels: {

@@ -130,6 +130,36 @@ describe("checkInboundAccessControl pairing grace", () => {
     expect(upsertPairingRequestMock).not.toHaveBeenCalled();
     expect(sendMessageMock).not.toHaveBeenCalled();
   });
+
+  it("allows self-chat visible outbound activity when the raw DM target is a LID", async () => {
+    setAccessControlTestConfig({
+      channels: {
+        whatsapp: {
+          dmPolicy: "pairing",
+          outboundPolicy: "allowlist",
+          allowFrom: ["+15550009999"],
+        },
+      },
+    });
+
+    const result = await checkInboundAccessControl({
+      accountId: "default",
+      from: "+15550009999",
+      selfE164: "+15550009999",
+      senderE164: "+15550009999",
+      group: false,
+      pushName: "Owner",
+      isFromMe: false,
+      sock: { sendMessage: sendMessageMock },
+      remoteJid: "987654321@lid",
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.visibleOutboundAllowed).toBe(true);
+    expect(result.outboundPolicy).toBe("allowlist");
+    expect(upsertPairingRequestMock).not.toHaveBeenCalled();
+    expect(sendMessageMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("WhatsApp dmPolicy precedence", () => {
