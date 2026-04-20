@@ -27,6 +27,7 @@ let lastClientOptions: {
   token?: string;
   password?: string;
   tlsFingerprint?: string;
+  allowInsecurePrivateWs?: boolean;
   clientDisplayName?: string;
   scopes?: string[];
   deviceIdentity?: unknown;
@@ -59,6 +60,7 @@ vi.mock("./client.js", () => ({
       url?: string;
       token?: string;
       password?: string;
+      allowInsecurePrivateWs?: boolean;
       clientDisplayName?: string;
       scopes?: string[];
       onHelloOk?: (hello: { features?: { methods?: string[] } }) => void | Promise<void>;
@@ -97,6 +99,7 @@ class StubGatewayClient {
     url?: string;
     token?: string;
     password?: string;
+    allowInsecurePrivateWs?: boolean;
     clientDisplayName?: string;
     scopes?: string[];
     onHelloOk?: (hello: { features?: { methods?: string[] } }) => void | Promise<void>;
@@ -167,6 +170,13 @@ function setLocalLoopbackGatewayConfig(port = 18789) {
   setGatewayNetworkDefaults(port);
 }
 
+function setLocalCustomBindGatewayConfig(host: string, port = 18789) {
+  loadConfig.mockReturnValue({
+    gateway: { mode: "local", bind: "custom", customBindHost: host },
+  });
+  setGatewayNetworkDefaults(port);
+}
+
 function makeRemotePasswordGatewayConfig(remotePassword: string, localPassword = "from-config") {
   return {
     gateway: {
@@ -228,14 +238,16 @@ describe("callGateway url resolution", () => {
       gateway: { mode: "local", bind: "tailnet", tls: { enabled: true } },
       tailnetIp: "100.64.0.1",
       lanIp: undefined,
-      expectedUrl: "wss://127.0.0.1:18800",
+      expectedUrl: "wss://100.64.0.1:18800",
+      expectedAllowInsecurePrivateWs: false,
     },
     {
       label: "tailnet without TLS",
       gateway: { mode: "local", bind: "tailnet" },
       tailnetIp: "100.64.0.1",
       lanIp: undefined,
-      expectedUrl: "ws://127.0.0.1:18800",
+      expectedUrl: "ws://100.64.0.1:18800",
+      expectedAllowInsecurePrivateWs: true,
     },
     {
       label: "lan with TLS",
@@ -243,6 +255,7 @@ describe("callGateway url resolution", () => {
       tailnetIp: undefined,
       lanIp: "192.168.1.42",
       expectedUrl: "wss://127.0.0.1:18800",
+      expectedAllowInsecurePrivateWs: false,
     },
     {
       label: "lan without TLS",
@@ -250,6 +263,7 @@ describe("callGateway url resolution", () => {
       tailnetIp: undefined,
       lanIp: "192.168.1.42",
       expectedUrl: "ws://127.0.0.1:18800",
+      expectedAllowInsecurePrivateWs: false,
     },
     {
       label: "lan without discovered LAN IP",
@@ -257,16 +271,30 @@ describe("callGateway url resolution", () => {
       tailnetIp: undefined,
       lanIp: undefined,
       expectedUrl: "ws://127.0.0.1:18800",
+      expectedAllowInsecurePrivateWs: false,
     },
-  ])("uses loopback for $label", async ({ gateway, tailnetIp, lanIp, expectedUrl }) => {
-    loadConfig.mockReturnValue({ gateway });
-    resolveGatewayPort.mockReturnValue(18800);
-    pickPrimaryTailnetIPv4.mockReturnValue(tailnetIp);
-    pickPrimaryLanIPv4.mockReturnValue(lanIp);
+  ])(
+    "uses the expected local gateway target for $label",
+    async ({ gateway, tailnetIp, lanIp, expectedUrl, expectedAllowInsecurePrivateWs }) => {
+      loadConfig.mockReturnValue({ gateway });
+      resolveGatewayPort.mockReturnValue(18800);
+      pickPrimaryTailnetIPv4.mockReturnValue(tailnetIp);
+      pickPrimaryLanIPv4.mockReturnValue(lanIp);
+
+      await callGateway({ method: "health" });
+
+      expect(lastClientOptions?.url).toBe(expectedUrl);
+      expect(lastClientOptions?.allowInsecurePrivateWs).toBe(expectedAllowInsecurePrivateWs);
+    },
+  );
+
+  it("uses the configured custom bind host for local custom binds", async () => {
+    setLocalCustomBindGatewayConfig("10.121.15.240", 18800);
 
     await callGateway({ method: "health" });
 
-    expect(lastClientOptions?.url).toBe(expectedUrl);
+    expect(lastClientOptions?.url).toBe("ws://10.121.15.240:18800");
+    expect(lastClientOptions?.allowInsecurePrivateWs).toBe(true);
   });
 
   it("uses url override in remote mode even when remote url is missing", async () => {
@@ -575,26 +603,78 @@ describe("buildGatewayConnectionDetails", () => {
 
   it.each([
     {
+      label: "tailnet with TLS",
+      gateway: { mode: "local", bind: "tailnet", tls: { enabled: true } },
+      tailnetIp: "100.64.0.1",
+      expectedUrl: "wss://100.64.0.1:18800",
+      expectedUrlSource: "local gateway.bind=tailnet",
+      expectedBindDetail: "Bind: tailnet",
+      expectedAllowInsecurePrivateWs: false,
+    },
+    {
+      label: "tailnet without TLS",
+      gateway: { mode: "local", bind: "tailnet" },
+      tailnetIp: "100.64.0.1",
+      expectedUrl: "ws://100.64.0.1:18800",
+      expectedUrlSource: "local gateway.bind=tailnet",
+      expectedBindDetail: "Bind: tailnet",
+      expectedAllowInsecurePrivateWs: true,
+    },
+    {
       label: "with TLS",
       gateway: { mode: "local", bind: "lan", tls: { enabled: true } },
       expectedUrl: "wss://127.0.0.1:18800",
+      expectedUrlSource: "local loopback",
+      expectedBindDetail: "Bind: lan",
+      expectedAllowInsecurePrivateWs: false,
     },
     {
       label: "without TLS",
       gateway: { mode: "local", bind: "lan" },
       expectedUrl: "ws://127.0.0.1:18800",
+      expectedUrlSource: "local loopback",
+      expectedBindDetail: "Bind: lan",
+      expectedAllowInsecurePrivateWs: false,
     },
-  ])("uses loopback URL for bind=lan $label", ({ gateway, expectedUrl }) => {
-    loadConfig.mockReturnValue({ gateway });
+  ])(
+    "uses the expected local URL for $label",
+    ({
+      gateway,
+      tailnetIp,
+      expectedUrl,
+      expectedUrlSource,
+      expectedBindDetail,
+      expectedAllowInsecurePrivateWs,
+    }) => {
+      loadConfig.mockReturnValue({ gateway });
+      resolveGatewayPort.mockReturnValue(18800);
+      pickPrimaryTailnetIPv4.mockReturnValue(tailnetIp);
+      pickPrimaryLanIPv4.mockReturnValue("10.0.0.5");
+
+      const details = buildGatewayConnectionDetails();
+
+      expect(details.url).toBe(expectedUrl);
+      expect(details.urlSource).toBe(expectedUrlSource);
+      expect(details.bindDetail).toBe(expectedBindDetail);
+      expect(details.localConfigTarget).toBe(true);
+      expect(details.allowInsecurePrivateWs).toBe(expectedAllowInsecurePrivateWs);
+    },
+  );
+
+  it("uses the configured custom bind host for local custom binds", () => {
+    loadConfig.mockReturnValue({
+      gateway: { mode: "local", bind: "custom", customBindHost: "10.121.15.240" },
+    });
     resolveGatewayPort.mockReturnValue(18800);
     pickPrimaryTailnetIPv4.mockReturnValue(undefined);
-    pickPrimaryLanIPv4.mockReturnValue("10.0.0.5");
 
     const details = buildGatewayConnectionDetails();
 
-    expect(details.url).toBe(expectedUrl);
-    expect(details.urlSource).toBe("local loopback");
-    expect(details.bindDetail).toBe("Bind: lan");
+    expect(details.url).toBe("ws://10.121.15.240:18800");
+    expect(details.urlSource).toBe("local gateway.bind=custom");
+    expect(details.bindDetail).toBe("Bind: custom");
+    expect(details.localConfigTarget).toBe(true);
+    expect(details.allowInsecurePrivateWs).toBe(true);
   });
 
   it("prefers remote url when configured", () => {

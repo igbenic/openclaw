@@ -22,6 +22,7 @@ export async function createOperatorApprovalsGatewayClient(
     url: bootstrap.url,
     token: bootstrap.auth.token,
     password: bootstrap.auth.password,
+    allowInsecurePrivateWs: bootstrap.allowInsecurePrivateWs,
     clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
     clientDisplayName: params.clientDisplayName,
     mode: GATEWAY_CLIENT_MODES.BACKEND,

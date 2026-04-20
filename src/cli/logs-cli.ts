@@ -1,7 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import type { Command } from "commander";
 import { buildGatewayConnectionDetails } from "../gateway/call.js";
-import { isLoopbackHost } from "../gateway/net.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { readConfiguredLogTail } from "../logging/log-tail.js";
 import { parseLogLine } from "../logging/parse-log-line.js";
@@ -103,14 +102,10 @@ function shouldUseLocalLogsFallback(opts: LogsCliOptions, error: unknown): boole
     return false;
   }
   const connection = buildGatewayConnectionDetails();
-  if (connection.urlSource !== "local loopback") {
+  if (connection.localConfigTarget !== true && connection.urlSource !== "local loopback") {
     return false;
   }
-  try {
-    return isLoopbackHost(new URL(connection.url).hostname);
-  } catch {
-    return false;
-  }
+  return true;
 }
 
 export function formatLogTimestamp(

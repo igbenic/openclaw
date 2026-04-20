@@ -1,13 +1,16 @@
 import { resolveConfigPath, resolveGatewayPort } from "../config/paths.js";
 import type { OpenClawConfig } from "../config/types.js";
+import { pickPrimaryTailnetIPv4 } from "../infra/tailnet.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import { isSecureWebSocketUrl } from "./net.js";
+import { isLoopbackHost, isSecureWebSocketUrl } from "./net.js";
 
 export type GatewayConnectionDetails = {
   url: string;
   urlSource: string;
   bindDetail?: string;
   remoteFallbackNote?: string;
+  localConfigTarget?: boolean;
+  allowInsecurePrivateWs?: boolean;
   message: string;
 };
 
@@ -16,6 +19,46 @@ type GatewayConnectionDetailResolvers = {
   resolveConfigPath?: (env: NodeJS.ProcessEnv) => string;
   resolveGatewayPort?: (cfg?: OpenClawConfig, env?: NodeJS.ProcessEnv) => number;
 };
+
+function resolvePreferredLocalGatewayTarget(params: {
+  bindMode: string;
+  customBindHost?: string;
+  localUrl: string;
+  scheme: "ws" | "wss";
+  port: number;
+}): {
+  url: string;
+  urlSource: string;
+  allowInsecurePrivateWs: boolean;
+} {
+  if (params.bindMode === "custom") {
+    const host = normalizeOptionalString(params.customBindHost);
+    if (host) {
+      return {
+        url: `${params.scheme}://${host}:${params.port}`,
+        urlSource: "local gateway.bind=custom",
+        allowInsecurePrivateWs: params.scheme === "ws" && !isLoopbackHost(host),
+      };
+    }
+  }
+
+  if (params.bindMode === "tailnet") {
+    const tailnetHost = normalizeOptionalString(pickPrimaryTailnetIPv4());
+    if (tailnetHost) {
+      return {
+        url: `${params.scheme}://${tailnetHost}:${params.port}`,
+        urlSource: "local gateway.bind=tailnet",
+        allowInsecurePrivateWs: params.scheme === "ws",
+      };
+    }
+  }
+
+  return {
+    url: params.localUrl,
+    urlSource: "local loopback",
+    allowInsecurePrivateWs: false,
+  };
+}
 
 export function buildGatewayConnectionDetailsWithResolvers(
   options: {
@@ -39,6 +82,13 @@ export function buildGatewayConnectionDetailsWithResolvers(
   const bindMode = config.gateway?.bind ?? "loopback";
   const scheme = tlsEnabled ? "wss" : "ws";
   const localUrl = `${scheme}://127.0.0.1:${localPort}`;
+  const preferredLocalTarget = resolvePreferredLocalGatewayTarget({
+    bindMode,
+    customBindHost: config.gateway?.customBindHost,
+    localUrl,
+    scheme,
+    port: localPort,
+  });
   const cliUrlOverride = normalizeOptionalString(options.url);
   const envUrlOverride = cliUrlOverride
     ? undefined
@@ -48,7 +98,7 @@ export function buildGatewayConnectionDetailsWithResolvers(
   const remoteMisconfigured = isRemoteMode && !urlOverride && !remoteUrl;
   const urlSourceHint =
     options.urlSource ?? (cliUrlOverride ? "cli" : envUrlOverride ? "env" : undefined);
-  const url = urlOverride || remoteUrl || localUrl;
+  const url = urlOverride || remoteUrl || preferredLocalTarget.url;
   const urlSource = urlOverride
     ? urlSourceHint === "env"
       ? "env OPENCLAW_GATEWAY_URL"
@@ -57,14 +107,17 @@ export function buildGatewayConnectionDetailsWithResolvers(
       ? "config gateway.remote.url"
       : remoteMisconfigured
         ? "missing gateway.remote.url (fallback local)"
-        : "local loopback";
+        : preferredLocalTarget.urlSource;
   const bindDetail = !urlOverride && !remoteUrl ? `Bind: ${bindMode}` : undefined;
   const remoteFallbackNote = remoteMisconfigured
     ? "Warn: gateway.mode=remote but gateway.remote.url is missing; set gateway.remote.url or switch gateway.mode=local."
     : undefined;
+  const localConfigTarget = !urlOverride && !remoteUrl && !remoteMisconfigured;
+  const allowInsecurePrivateWs =
+    !urlOverride && !remoteUrl ? preferredLocalTarget.allowInsecurePrivateWs : false;
 
   const allowPrivateWs = process.env.OPENCLAW_ALLOW_INSECURE_PRIVATE_WS === "1";
-  if (!isSecureWebSocketUrl(url, { allowPrivateWs })) {
+  if (!isSecureWebSocketUrl(url, { allowPrivateWs: allowPrivateWs || allowInsecurePrivateWs })) {
     throw new Error(
       [
         `SECURITY ERROR: Gateway URL "${url}" uses plaintext ws:// to a non-loopback address.`,
@@ -99,6 +152,8 @@ export function buildGatewayConnectionDetailsWithResolvers(
     urlSource,
     bindDetail,
     remoteFallbackNote,
+    localConfigTarget,
+    allowInsecurePrivateWs,
     message,
   };
 }

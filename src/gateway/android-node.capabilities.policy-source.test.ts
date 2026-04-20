@@ -16,6 +16,18 @@ describe("shouldFetchRemotePolicyConfig", () => {
     expect(shouldFetchRemotePolicyConfig(details({ urlSource: "local loopback" }))).toBe(false);
   });
 
+  it("returns false for non-loopback local bind targets", () => {
+    expect(
+      shouldFetchRemotePolicyConfig(
+        details({
+          url: "ws://10.121.15.240:18789",
+          urlSource: "local gateway.bind=custom",
+          localConfigTarget: true,
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it("returns true for config-driven remote urls even if loopback-tunneled", () => {
     expect(
       shouldFetchRemotePolicyConfig(

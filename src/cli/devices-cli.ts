@@ -1,6 +1,5 @@
 import type { Command } from "commander";
 import { buildGatewayConnectionDetails, callGateway } from "../gateway/call.js";
-import { isLoopbackHost } from "../gateway/net.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../gateway/protocol/client-info.js";
 import {
   approveDevicePairing,
@@ -121,14 +120,10 @@ function shouldUseLocalPairingFallback(opts: DevicesRpcOpts, error: unknown): bo
     return false;
   }
   const connection = buildGatewayConnectionDetails();
-  if (connection.urlSource !== "local loopback") {
+  if (connection.localConfigTarget !== true && connection.urlSource !== "local loopback") {
     return false;
   }
-  try {
-    return isLoopbackHost(new URL(connection.url).hostname);
-  } catch {
-    return false;
-  }
+  return true;
 }
 
 function redactLocalPairedDevice(device: InfraPairedDevice): PairedDevice {

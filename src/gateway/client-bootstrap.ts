@@ -21,6 +21,7 @@ export async function resolveGatewayClientBootstrap(params: {
 }): Promise<{
   url: string;
   urlSource: string;
+  allowInsecurePrivateWs?: boolean;
   auth: {
     token?: string;
     password?: string;
@@ -41,6 +42,7 @@ export async function resolveGatewayClientBootstrap(params: {
   return {
     url: connection.url,
     urlSource: connection.urlSource,
+    allowInsecurePrivateWs: connection.allowInsecurePrivateWs,
     auth,
   };
 }

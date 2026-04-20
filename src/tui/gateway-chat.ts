@@ -50,6 +50,7 @@ type ResolvedGatewayConnection = {
   url: string;
   token?: string;
   password?: string;
+  allowInsecurePrivateWs?: boolean;
   allowInsecureLocalOperatorUi?: boolean;
 };
 
@@ -149,6 +150,7 @@ export class GatewayChatClient {
       url: connection.url,
       token: connection.token,
       password: connection.password,
+      allowInsecurePrivateWs: connection.allowInsecurePrivateWs,
       clientName: GATEWAY_CLIENT_NAMES.TUI,
       clientDisplayName: "openclaw-tui",
       clientVersion: VERSION,
@@ -282,10 +284,11 @@ export async function resolveGatewayConnection(
     explicitAuth,
     errorHint: "Fix: pass --token or --password when using --url.",
   });
-  const url = buildGatewayConnectionDetails({
+  const connectionDetails = buildGatewayConnectionDetails({
     config,
     ...(urlOverride ? { url: urlOverride } : {}),
-  }).url;
+  });
+  const url = connectionDetails.url;
   const allowInsecureLocalOperatorUi = (() => {
     if (config.gateway?.controlUi?.allowInsecureAuth !== true) {
       return false;
@@ -302,6 +305,7 @@ export async function resolveGatewayConnection(
       url,
       token: explicitAuth.token,
       password: explicitAuth.password,
+      allowInsecurePrivateWs: connectionDetails.allowInsecurePrivateWs,
       allowInsecureLocalOperatorUi,
     };
   }
@@ -320,6 +324,7 @@ export async function resolveGatewayConnection(
       url,
       token: resolved.token,
       password: resolved.password,
+      allowInsecurePrivateWs: connectionDetails.allowInsecurePrivateWs,
       allowInsecureLocalOperatorUi: false,
     };
   }
@@ -335,6 +340,7 @@ export async function resolveGatewayConnection(
       url,
       token: resolved.token,
       password: resolved.password,
+      allowInsecurePrivateWs: connectionDetails.allowInsecurePrivateWs,
       allowInsecureLocalOperatorUi,
     };
   }
@@ -358,6 +364,7 @@ export async function resolveGatewayConnection(
     url,
     token: resolved.token,
     password: resolved.password,
+    allowInsecurePrivateWs: connectionDetails.allowInsecurePrivateWs,
     allowInsecureLocalOperatorUi,
   };
 }

@@ -105,6 +105,7 @@ export class OpenClawChannelBridge {
       url: bootstrap.url,
       token: bootstrap.auth.token,
       password: bootstrap.auth.password,
+      allowInsecurePrivateWs: bootstrap.allowInsecurePrivateWs,
       clientName: GATEWAY_CLIENT_NAMES.CLI,
       clientDisplayName: "OpenClaw MCP",
       clientVersion: VERSION,
