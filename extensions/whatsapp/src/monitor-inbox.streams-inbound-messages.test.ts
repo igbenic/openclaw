@@ -223,6 +223,7 @@ describe("web monitor inbox", () => {
         whatsapp: {
           allowFrom: ["+999"],
           outboundPolicy: "allowlist",
+          outboundAllowFrom: ["+999"],
         },
       },
       messages: {
@@ -276,6 +277,7 @@ describe("web monitor inbox", () => {
         whatsapp: {
           allowFrom: ["+123"],
           outboundPolicy: "allowlist",
+          outboundAllowFrom: ["+123"],
         },
       },
       messages: {
@@ -312,15 +314,56 @@ describe("web monitor inbox", () => {
     );
     expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
     expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("composing", "777@lid");
-    expect(sock.readMessages).toHaveBeenCalledWith([
-      {
-        remoteJid: "777@lid",
-        id: messageId,
-        participant: undefined,
-        fromMe: false,
-      },
-    ]);
+    expect(sock.readMessages).not.toHaveBeenCalled();
     expect(sock.sendMessage).toHaveBeenCalledWith("777@lid", { text: "pong" });
+
+    await listener.close();
+  });
+
+  it("keeps self-chat inbound visible-outbound blocked when only allowFrom is set", async () => {
+    mockLoadConfig.mockReturnValue({
+      channels: {
+        whatsapp: {
+          allowFrom: ["+123"],
+          outboundPolicy: "allowlist",
+        },
+      },
+      messages: {
+        messagePrefix: undefined,
+        responsePrefix: undefined,
+      },
+    });
+    const onMessage = vi.fn(async (msg) => {
+      await msg.sendComposing();
+      await msg.reply("pong");
+    });
+
+    const { listener, sock } = await startInboxMonitor(onMessage as InboxOnMessage);
+    sock.signalRepository.lidMapping.getPNForLID.mockResolvedValueOnce("123@s.whatsapp.net");
+    const messageId = nextMessageId("allowlist-lid-self-readonly");
+    sock.ev.emit(
+      "messages.upsert",
+      buildNotifyMessageUpsert({
+        id: messageId,
+        remoteJid: "777@lid",
+        text: "ping",
+        timestamp: 1_700_000_000,
+        pushName: "Tester",
+      }),
+    );
+    await waitForMessageCalls(onMessage, 1);
+
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "+123",
+        visibleOutboundAllowed: false,
+        visibleOutboundPolicy: "allowlist",
+      }),
+    );
+    expect(sock.sendPresenceUpdate).toHaveBeenNthCalledWith(1, "unavailable");
+    expect(sock.sendPresenceUpdate).not.toHaveBeenCalledWith("composing", "777@lid");
+    expect(sock.readMessages).not.toHaveBeenCalled();
+    expect(sock.sendMessage).not.toHaveBeenCalled();
 
     await listener.close();
   });
@@ -331,6 +374,7 @@ describe("web monitor inbox", () => {
         whatsapp: {
           allowFrom: ["+999"],
           outboundPolicy: "allowlist",
+          outboundAllowFrom: ["*"],
           groupPolicy: "open",
         },
       },

@@ -225,15 +225,16 @@ describe("handleWhatsAppAction", () => {
     },
   );
 
-  it("applies default account allowFrom when accountId is omitted", async () => {
+  it("applies default account outboundAllowFrom when accountId is omitted", async () => {
     const cfg = {
       channels: {
         whatsapp: {
           actions: { reactions: true },
-          allowFrom: ["111@s.whatsapp.net"],
+          outboundPolicy: "allowlist",
+          outboundAllowFrom: ["111@s.whatsapp.net"],
           accounts: {
             [DEFAULT_ACCOUNT_ID]: {
-              allowFrom: ["222@s.whatsapp.net"],
+              outboundAllowFrom: ["222@s.whatsapp.net"],
             },
           },
         },

@@ -16,12 +16,12 @@ export function resolveAuthorizedWhatsAppOutboundTarget(params: {
   });
   const resolution = resolveWhatsAppOutboundTarget({
     to: params.chatJid,
-    allowFrom: account.allowFrom ?? [],
+    allowFrom: account.outboundAllowFrom ?? [],
     mode: "implicit",
   });
   if (!resolution.ok) {
     throw new ToolAuthorizationError(
-      `WhatsApp ${params.actionLabel} blocked: chatJid "${params.chatJid}" is not in the configured allowFrom list for account "${account.accountId}".`,
+      `WhatsApp ${params.actionLabel} blocked: ${resolution.error.message}`,
     );
   }
   const outboundDecision = resolveWhatsAppVisibleOutboundDecision({

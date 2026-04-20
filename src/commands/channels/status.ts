@@ -82,6 +82,9 @@ export function formatGatewayChannelsStatusLines(payload: Record<string, unknown
       if (Array.isArray(account.allowFrom) && account.allowFrom.length > 0) {
         bits.push(`allow:${account.allowFrom.slice(0, 2).join(",")}`);
       }
+      if (Array.isArray(account.outboundAllowFrom) && account.outboundAllowFrom.length > 0) {
+        bits.push(`outbound-allow:${account.outboundAllowFrom.slice(0, 2).join(",")}`);
+      }
       appendTokenSourceBits(bits, account);
       const application = account.application as
         | { intents?: { messageContent?: string } }

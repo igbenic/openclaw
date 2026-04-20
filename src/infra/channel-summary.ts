@@ -107,6 +107,17 @@ const buildAccountDetails = (params: {
       details.push(`allow:${formatted.join(",")}`);
     }
   }
+  if (params.includeAllowFrom && snapshot.outboundAllowFrom?.length) {
+    const formatted = formatChannelAllowFrom({
+      plugin: params.plugin,
+      cfg: params.cfg,
+      accountId: snapshot.accountId,
+      allowFrom: snapshot.outboundAllowFrom,
+    }).slice(0, 2);
+    if (formatted.length > 0) {
+      details.push(`outbound-allow:${formatted.join(",")}`);
+    }
+  }
   return details;
 };
 

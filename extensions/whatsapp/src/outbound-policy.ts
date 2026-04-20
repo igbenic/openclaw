@@ -27,8 +27,8 @@ export type WhatsAppVisibleOutboundDecision =
       reason:
         | "Global presence stays unavailable while outboundPolicy is not open."
         | `Visible outbound WhatsApp activity is disabled for account "${string}".`
-        | `Visible outbound WhatsApp activity for account "${string}" only allows direct chats listed in allowFrom; group chats stay read-only.`
-        | `Visible outbound WhatsApp activity for account "${string}" only allows direct chats listed in allowFrom; target "${string}" is not allowlisted.`
+        | `Visible outbound WhatsApp activity for account "${string}" only allows direct chats listed in outboundAllowFrom; group chats stay read-only.`
+        | `Visible outbound WhatsApp activity for account "${string}" only allows direct chats listed in outboundAllowFrom; target "${string}" is not allowlisted.`
         | `Visible outbound WhatsApp activity for account "${string}" could not normalize target "${string}".`;
     };
 
@@ -37,7 +37,7 @@ function resolveWhatsAppVisibleOutboundContext(
 ): {
   account: ResolvedWhatsAppAccount;
   outboundPolicy: WhatsAppVisibleOutboundPolicy;
-  normalizedAllowFrom: string[];
+  normalizedOutboundAllowFrom: string[];
   allowAllDirect: boolean;
 } {
   const account =
@@ -48,12 +48,14 @@ function resolveWhatsAppVisibleOutboundContext(
           accountId: params.accountId,
         });
   const outboundPolicy = account.outboundPolicy ?? "open";
-  const normalizedAllowFrom = normalizeWhatsAppAllowFromEntries(account.allowFrom ?? []);
+  const normalizedOutboundAllowFrom = normalizeWhatsAppAllowFromEntries(
+    account.outboundAllowFrom ?? [],
+  );
   return {
     account,
     outboundPolicy,
-    normalizedAllowFrom,
-    allowAllDirect: normalizedAllowFrom.includes("*"),
+    normalizedOutboundAllowFrom,
+    allowAllDirect: normalizedOutboundAllowFrom.includes("*"),
   };
 }
 
@@ -75,7 +77,7 @@ export function resolveWhatsAppVisibleOutboundDecision(params: {
       accountId: params.accountId,
     });
   })();
-  const { account, outboundPolicy, normalizedAllowFrom, allowAllDirect } = context;
+  const { account, outboundPolicy, normalizedOutboundAllowFrom, allowAllDirect } = context;
   const trimmedTarget = params.target?.trim() ?? "";
 
   if (!trimmedTarget) {
@@ -129,13 +131,13 @@ export function resolveWhatsAppVisibleOutboundDecision(params: {
       account,
       outboundPolicy,
       normalizedTarget,
-      reason: `Visible outbound WhatsApp activity for account "${account.accountId}" only allows direct chats listed in allowFrom; group chats stay read-only.`,
+      reason: `Visible outbound WhatsApp activity for account "${account.accountId}" only allows direct chats listed in outboundAllowFrom; group chats stay read-only.`,
     };
   }
 
   if (
     allowAllDirect ||
-    normalizedAllowFrom.filter((entry) => entry !== "*").includes(normalizedTarget)
+    normalizedOutboundAllowFrom.filter((entry) => entry !== "*").includes(normalizedTarget)
   ) {
     return {
       allowed: true,
@@ -150,7 +152,7 @@ export function resolveWhatsAppVisibleOutboundDecision(params: {
     account,
     outboundPolicy,
     normalizedTarget,
-    reason: `Visible outbound WhatsApp activity for account "${account.accountId}" only allows direct chats listed in allowFrom; target "${normalizedTarget}" is not allowlisted.`,
+    reason: `Visible outbound WhatsApp activity for account "${account.accountId}" only allows direct chats listed in outboundAllowFrom; target "${normalizedTarget}" is not allowlisted.`,
   };
 }
 

@@ -166,6 +166,7 @@ export function projectSafeChannelAccountSnapshotFields(
   const mode = normalizeOptionalString(record.mode);
   const dmPolicy = normalizeOptionalString(record.dmPolicy);
   const outboundPolicy = normalizeOptionalString(record.outboundPolicy);
+  const outboundAllowFrom = readStringArray(record, "outboundAllowFrom");
   const baseUrl = normalizeOptionalString(record.baseUrl);
   const cliPath = normalizeOptionalString(record.cliPath);
   const dbPath = normalizeOptionalString(record.dbPath);
@@ -194,6 +195,7 @@ export function projectSafeChannelAccountSnapshotFields(
     ...(readStringArray(record, "allowFrom")
       ? { allowFrom: readStringArray(record, "allowFrom") }
       : {}),
+    ...(outboundAllowFrom ? { outboundAllowFrom } : {}),
     ...projectCredentialSnapshotFields(account),
     ...(baseUrl ? { baseUrl: stripUrlUserInfo(baseUrl) } : {}),
     ...(readBoolean(record, "allowUnmentionedGroups") !== undefined

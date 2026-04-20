@@ -51,7 +51,7 @@ type WhatsAppSharedConfig = {
   /**
    * Visible outbound activity policy:
    * - "open": preserve normal outbound behavior
-   * - "allowlist": allow visible outbound activity only to direct chats in allowFrom
+   * - "allowlist": allow visible outbound activity only to direct chats in outboundAllowFrom
    * - "disabled": keep WhatsApp read-only while still ingesting inbound messages
    */
   outboundPolicy?: WhatsAppOutboundPolicy;
@@ -59,6 +59,8 @@ type WhatsAppSharedConfig = {
   selfChatMode?: boolean;
   /** Optional allowlist for WhatsApp direct chats (E.164). */
   allowFrom?: string[];
+  /** Optional allowlist for visible WhatsApp outbound direct chats (E.164). */
+  outboundAllowFrom?: string[];
   /** Default delivery target for CLI `--deliver` when no explicit `--reply-to` is provided (E.164 or group JID). */
   defaultTo?: string;
   /** Optional allowlist for WhatsApp group senders (E.164). */

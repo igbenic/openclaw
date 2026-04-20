@@ -11,7 +11,11 @@ export const whatsAppChannelConfigUiHints = {
   },
   outboundPolicy: {
     label: "WhatsApp Outbound Policy",
-    help: 'Visible outbound WhatsApp activity policy. "allowlist" only sends visible output to direct chats listed in allowFrom; "disabled" keeps WhatsApp read-only.',
+    help: 'Visible outbound WhatsApp activity policy. "allowlist" only sends visible output to direct chats listed in outboundAllowFrom; leave outboundAllowFrom empty to keep WhatsApp read-only.',
+  },
+  outboundAllowFrom: {
+    label: "WhatsApp Outbound Allowlist",
+    help: 'Allowlist for visible WhatsApp outbound direct chats. Used only when outboundPolicy="allowlist"; groups stay read-only even with "*".',
   },
   selfChatMode: {
     label: "WhatsApp Self-Phone Mode",

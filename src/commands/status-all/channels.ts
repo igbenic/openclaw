@@ -188,6 +188,18 @@ const buildAccountNotes = (params: {
     }
   }
 
+  if (snapshot.outboundAllowFrom?.length) {
+    const formatted = formatChannelAllowFrom({
+      plugin,
+      cfg,
+      accountId: snapshot.accountId,
+      allowFrom: snapshot.outboundAllowFrom,
+    }).slice(0, 3);
+    if (formatted.length > 0) {
+      notes.push(`outbound-allow:${formatted.join(",")}`);
+    }
+  }
+
   return notes;
 };
 

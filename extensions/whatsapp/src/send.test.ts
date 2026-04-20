@@ -221,12 +221,31 @@ describe("web outbound", () => {
     expect(sendReaction).not.toHaveBeenCalled();
   });
 
-  it("allows allowlisted direct chats but blocks groups in outbound allowlist mode", async () => {
+  it("treats empty outboundAllowFrom as read-only in outbound allowlist mode", async () => {
     const cfg = {
       channels: {
         whatsapp: {
           outboundPolicy: "allowlist",
           allowFrom: ["+1555"],
+        },
+      },
+    } as OpenClawConfig;
+
+    await expect(sendMessageWhatsApp("+1555", "hi", { verbose: false, cfg })).rejects.toThrow(
+      /outboundallowfrom/i,
+    );
+
+    expect(sendComposingTo).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("allows outbound-allowlisted direct chats but blocks groups in outbound allowlist mode", async () => {
+    const cfg = {
+      channels: {
+        whatsapp: {
+          outboundPolicy: "allowlist",
+          allowFrom: ["+1666"],
+          outboundAllowFrom: ["+1555"],
         },
       },
     } as OpenClawConfig;

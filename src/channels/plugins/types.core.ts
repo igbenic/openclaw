@@ -211,6 +211,7 @@ export type ChannelAccountSnapshot = {
   dmPolicy?: string;
   outboundPolicy?: string;
   allowFrom?: string[];
+  outboundAllowFrom?: string[];
   tokenSource?: string;
   botTokenSource?: string;
   appTokenSource?: string;

@@ -59,18 +59,6 @@ function expectAllowedForTarget(params: {
   );
 }
 
-function expectDeniedForTarget(params: {
-  allowFrom: ResolveParams["allowFrom"];
-  mode: ResolveParams["mode"];
-  to?: string;
-}) {
-  expectResolutionError({
-    to: params.to ?? PRIMARY_TARGET,
-    allowFrom: params.allowFrom,
-    mode: params.mode,
-  });
-}
-
 describe("resolveWhatsAppOutboundTarget", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -154,7 +142,7 @@ describe("resolveWhatsAppOutboundTarget", () => {
           allowFrom: [SECONDARY_TARGET],
           mode: "implicit",
         },
-        `Target "${SECONDARY_TARGET}" is not listed in the configured WhatsApp allowFrom policy.`,
+        `Target "${SECONDARY_TARGET}" is not listed in the configured WhatsApp outboundAllowFrom policy.`,
       );
     });
 
@@ -170,7 +158,7 @@ describe("resolveWhatsAppOutboundTarget", () => {
           allowFrom: [SECONDARY_TARGET],
           mode: "implicit",
         },
-        `Target "${PRIMARY_TARGET}" is not listed in the configured WhatsApp allowFrom policy.`,
+        `Target "${PRIMARY_TARGET}" is not listed in the configured WhatsApp outboundAllowFrom policy.`,
       );
     });
 
@@ -207,9 +195,12 @@ describe("resolveWhatsAppOutboundTarget", () => {
       expectAllowedForTarget({ allowFrom: [PRIMARY_TARGET], mode: "heartbeat" });
     });
 
-    it("denies message when target is not in allowList in heartbeat mode", () => {
-      mockNormalizedDirectMessage(PRIMARY_TARGET, SECONDARY_TARGET);
-      expectDeniedForTarget({ allowFrom: [SECONDARY_TARGET], mode: "heartbeat" });
+    it("does not enforce allowList in heartbeat mode", () => {
+      vi.mocked(normalize.normalizeWhatsAppTarget)
+        .mockReturnValueOnce(SECONDARY_TARGET)
+        .mockReturnValueOnce(PRIMARY_TARGET);
+      vi.mocked(normalize.isWhatsAppGroupJid).mockReturnValueOnce(false);
+      expectAllowedForTarget({ allowFrom: [SECONDARY_TARGET], mode: "heartbeat" });
     });
   });
 
@@ -224,13 +215,19 @@ describe("resolveWhatsAppOutboundTarget", () => {
       expectAllowedForTarget({ allowFrom: undefined, mode: undefined });
     });
 
-    it("enforces allowList in custom mode string", () => {
-      mockNormalizedDirectMessage(SECONDARY_TARGET, PRIMARY_TARGET);
-      expectDeniedForTarget({ allowFrom: [SECONDARY_TARGET], mode: "broadcast" });
+    it("does not enforce allowList in custom mode string", () => {
+      vi.mocked(normalize.normalizeWhatsAppTarget)
+        .mockReturnValueOnce(SECONDARY_TARGET)
+        .mockReturnValueOnce(PRIMARY_TARGET);
+      vi.mocked(normalize.isWhatsAppGroupJid).mockReturnValueOnce(false);
+      expectAllowedForTarget({ allowFrom: [SECONDARY_TARGET], mode: "broadcast" });
     });
 
     it("allows message in custom mode string when target is in allowList", () => {
-      mockNormalizedDirectMessage(PRIMARY_TARGET, PRIMARY_TARGET);
+      vi.mocked(normalize.normalizeWhatsAppTarget)
+        .mockReturnValueOnce(PRIMARY_TARGET)
+        .mockReturnValueOnce(PRIMARY_TARGET);
+      vi.mocked(normalize.isWhatsAppGroupJid).mockReturnValueOnce(false);
       expectAllowedForTarget({ allowFrom: [PRIMARY_TARGET], mode: "broadcast" });
     });
   });

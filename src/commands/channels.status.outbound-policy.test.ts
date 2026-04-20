@@ -49,11 +49,13 @@ describe("gateway channels status outbound policy", () => {
             dmPolicy: "pairing",
             outboundPolicy: "allowlist",
             allowFrom: ["+15550001111"],
+            outboundAllowFrom: ["+15550002222"],
           },
         ],
       },
     });
 
     expect(lines.join("\n")).toContain("outbound:allowlist");
+    expect(lines.join("\n")).toContain("outbound-allow:+15550002222");
   });
 });

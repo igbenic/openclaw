@@ -6,7 +6,9 @@ export type WhatsAppOutboundTargetResolution =
   | { ok: false; error: Error };
 
 function whatsappAllowFromPolicyError(target: string): Error {
-  return new Error(`Target "${target}" is not listed in the configured WhatsApp allowFrom policy.`);
+  return new Error(
+    `Target "${target}" is not listed in the configured WhatsApp outboundAllowFrom policy.`,
+  );
 }
 
 export function resolveWhatsAppOutboundTarget(params: {
@@ -33,6 +35,9 @@ export function resolveWhatsAppOutboundTarget(params: {
       };
     }
     if (isWhatsAppGroupJid(normalizedTo)) {
+      return { ok: true, to: normalizedTo };
+    }
+    if (params.mode !== "implicit") {
       return { ok: true, to: normalizedTo };
     }
     if (hasWildcard || allowList.length === 0) {

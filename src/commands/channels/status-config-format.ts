@@ -42,6 +42,18 @@ export async function formatConfigChannelsStatusLines(
       const bits: string[] = [];
       appendEnabledConfiguredLinkedBits(bits, account);
       appendModeBit(bits, account);
+      if (typeof account.dmPolicy === "string" && account.dmPolicy.length > 0) {
+        bits.push(`dm:${account.dmPolicy}`);
+      }
+      if (typeof account.outboundPolicy === "string" && account.outboundPolicy.length > 0) {
+        bits.push(`outbound:${account.outboundPolicy}`);
+      }
+      if (Array.isArray(account.allowFrom) && account.allowFrom.length > 0) {
+        bits.push(`allow:${account.allowFrom.slice(0, 2).join(",")}`);
+      }
+      if (Array.isArray(account.outboundAllowFrom) && account.outboundAllowFrom.length > 0) {
+        bits.push(`outbound-allow:${account.outboundAllowFrom.slice(0, 2).join(",")}`);
+      }
       appendTokenSourceBits(bits, account);
       appendBaseUrlBit(bits, account);
       return buildChannelAccountLine(provider, account, bits);

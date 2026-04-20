@@ -228,6 +228,7 @@ export function createWhatsAppPluginBase(params: {
             dmPolicy: account.dmPolicy,
             outboundPolicy: account.outboundPolicy,
             allowFrom: account.allowFrom,
+            outboundAllowFrom: account.outboundAllowFrom,
           },
         }),
     },

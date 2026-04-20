@@ -48,6 +48,7 @@ openclaw plugins install @openclaw/whatsapp
       dmPolicy: "pairing",
       outboundPolicy: "allowlist",
       allowFrom: ["+15551234567"],
+      outboundAllowFrom: ["+15551234567"],
       groupPolicy: "allowlist",
       groupAllowFrom: ["+15551234567"],
     },
@@ -175,7 +176,7 @@ OpenClaw recommends running WhatsApp on a separate number when possible. (The ch
     `channels.whatsapp.outboundPolicy` controls what visible WhatsApp activity OpenClaw may emit after inbound messages are accepted:
 
     - `open` (default): preserve normal behavior
-    - `allowlist`: allow visible outbound activity only to direct chats in `allowFrom`
+    - `allowlist`: allow visible outbound activity only to direct chats in `outboundAllowFrom`
     - `disabled`: never emit visible outbound activity
 
     Visible outbound activity includes:
@@ -190,11 +191,27 @@ OpenClaw recommends running WhatsApp on a separate number when possible. (The ch
     Behavior notes:
 
     - `allowlist` keeps group chats read-only even if inbound group messages are allowed
-    - `allowlist` reuses `allowFrom`; `["*"]` allows all direct chats while still silencing groups
-    - `allowlist` requires a non-empty effective `allowFrom`
+    - `outboundAllowFrom` is separate from inbound `allowFrom`
+    - `allowlist` with empty or unset `outboundAllowFrom` is intentionally read-only
+    - `outboundAllowFrom: ["*"]` allows all direct chats while still silencing groups
     - blocked automatic writes are suppressed with verbose logs; explicit sends fail fast
 
-    Multi-account override: `channels.whatsapp.accounts.<id>.outboundPolicy`.
+    Multi-account overrides: `channels.whatsapp.accounts.<id>.outboundPolicy` and `channels.whatsapp.accounts.<id>.outboundAllowFrom`.
+
+    Example:
+
+    ```json5
+    {
+      channels: {
+        whatsapp: {
+          dmPolicy: "allowlist",
+          allowFrom: ["+15551234567", "+15557654321"],
+          outboundPolicy: "allowlist",
+          outboundAllowFrom: ["+15551234567"],
+        },
+      },
+    }
+    ```
 
   </Tab>
 
@@ -503,7 +520,7 @@ Primary reference:
 High-signal WhatsApp fields:
 
 - access: `dmPolicy`, `allowFrom`, `groupPolicy`, `groupAllowFrom`, `groups`
-- visible outbound: `outboundPolicy`
+- visible outbound: `outboundPolicy`, `outboundAllowFrom`
 - delivery: `textChunkLimit`, `chunkMode`, `mediaMaxMb`, `sendReadReceipts`, `ackReaction`, `reactionLevel`
 - multi-account: `accounts.<id>.enabled`, `accounts.<id>.authDir`, account-level overrides
 - operations: `configWrites`, `debounceMs`, `web.enabled`, `web.heartbeatSeconds`, `web.reconnect.*`

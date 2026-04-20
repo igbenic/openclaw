@@ -75,6 +75,7 @@ function makeTelegramSummaryPlugin(params: {
   statusState?: string;
   authAgeMs?: number;
   allowFrom?: string[];
+  outboundAllowFrom?: string[];
   outboundPolicy?: string;
 }): ChannelPlugin {
   const getAccount = () => ({
@@ -84,6 +85,7 @@ function makeTelegramSummaryPlugin(params: {
     configured: params.configured,
     linked: params.linked,
     allowFrom: params.allowFrom ?? [],
+    outboundAllowFrom: params.outboundAllowFrom ?? [],
     dmPolicy: "mutuals",
     outboundPolicy: params.outboundPolicy,
     tokenSource: "env",
@@ -244,6 +246,8 @@ describe("buildChannelSummary", () => {
             linked: true,
             authAgeMs: 300_000,
             allowFrom: ["alice", "bob", "carol"],
+            outboundAllowFrom: ["dora", "erin", "frank"],
+            outboundPolicy: "allowlist",
           }),
           source: "test",
         },
@@ -256,7 +260,12 @@ describe("buildChannelSummary", () => {
     });
 
     expect(lines).toContain("Telegram: linked +15551234567 auth 5m ago");
-    expect(lines).toContain("  - primary (Main Bot) (dm:mutuals, token:env, allow:alice,bob)");
+    const detailLine = lines.find((line) => line.includes("primary (Main Bot)"));
+    expect(detailLine).toContain("dm:mutuals");
+    expect(detailLine).toContain("outbound:allowlist");
+    expect(detailLine).toContain("token:env");
+    expect(detailLine).toContain("allow:alice,bob");
+    expect(detailLine).toContain("outbound-allow:alice,bob");
   });
 
   it("includes outbound policy details when present", async () => {

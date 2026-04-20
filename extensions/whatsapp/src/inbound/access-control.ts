@@ -75,6 +75,7 @@ export async function checkInboundAccessControl(params: {
   const buildResult = (overrides: Pick<InboundAccessControlResult, "allowed" | "shouldMarkRead">) =>
     ({
       ...overrides,
+      shouldMarkRead: overrides.shouldMarkRead && !policy.isSelfChat,
       isSelfChat: policy.isSelfChat,
       resolvedAccountId: policy.account.accountId,
       visibleOutboundAllowed: visibleOutbound.allowed,

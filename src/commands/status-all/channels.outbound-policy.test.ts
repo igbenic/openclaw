@@ -17,6 +17,7 @@ function makeTestPlugin(): ChannelPlugin {
     dmPolicy: "pairing",
     outboundPolicy: "allowlist",
     allowFrom: ["+15550001111"],
+    outboundAllowFrom: ["+15550002222"],
   };
 
   return {
@@ -52,5 +53,6 @@ describe("status-all channels outbound policy notes", () => {
 
     expect(table.details).toHaveLength(1);
     expect(table.details[0]?.rows[0]?.Notes).toContain("outbound:allowlist");
+    expect(table.details[0]?.rows[0]?.Notes).toContain("outbound-allow:+15550001111");
   });
 });
