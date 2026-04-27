@@ -127,6 +127,7 @@ vi.mock("../runtime.js", () => ({
 }));
 
 vi.mock("../config/config.js", () => ({
+  getRuntimeConfig: mocks.loadConfig as typeof import("../config/config.js").getRuntimeConfig,
   loadConfig: mocks.loadConfig as typeof import("../config/config.js").loadConfig,
 }));
 
@@ -169,6 +170,10 @@ vi.mock("../commands/models/auth.js", () => ({
 vi.mock("../commands/models/list.js", () => ({
   modelsStatusCommand:
     mocks.modelsStatusCommand as typeof import("../commands/models/list.js").modelsStatusCommand,
+}));
+vi.mock("../commands/models/list.status-command.js", () => ({
+  modelsStatusCommand:
+    mocks.modelsStatusCommand as typeof import("../commands/models/list.status-command.js").modelsStatusCommand,
 }));
 
 vi.mock("../gateway/call.js", () => ({

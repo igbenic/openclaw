@@ -23,7 +23,7 @@ import {
   createBoundDeliveryRouter,
   getGlobalHookRunner,
   isEmbeddedPiRunActive,
-  loadConfig,
+  getRuntimeConfig,
   loadSessionStore,
   queueEmbeddedPiMessage,
   resolveActiveEmbeddedRunSessionId,
@@ -51,7 +51,7 @@ const MAX_TIMER_SAFE_TIMEOUT_MS = 2_147_000_000;
 
 type SubagentAnnounceDeliveryDeps = {
   callGateway: typeof callGateway;
-  loadConfig: typeof loadConfig;
+  getRuntimeConfig: typeof getRuntimeConfig;
   getRequesterSessionActivity: (requesterSessionKey: string) => {
     sessionId?: string;
     isActive: boolean;
@@ -62,7 +62,7 @@ type SubagentAnnounceDeliveryDeps = {
 
 const defaultSubagentAnnounceDeliveryDeps: SubagentAnnounceDeliveryDeps = {
   callGateway,
-  loadConfig,
+  getRuntimeConfig,
   getRequesterSessionActivity: (requesterSessionKey: string) => {
     const sessionId =
       resolveActiveEmbeddedRunSessionId(requesterSessionKey) ??
@@ -220,6 +220,13 @@ function isTransientAnnounceDeliveryError(error: unknown): boolean {
   return TRANSIENT_ANNOUNCE_DELIVERY_ERROR_PATTERNS.some((re) => re.test(message));
 }
 
+function isPermanentAnnounceDeliveryError(error: unknown): boolean {
+  const message = summarizeDeliveryError(error);
+  return Boolean(
+    message && PERMANENT_ANNOUNCE_DELIVERY_ERROR_PATTERNS.some((re) => re.test(message)),
+  );
+}
+
 async function waitForAnnounceRetryDelay(ms: number, signal?: AbortSignal): Promise<void> {
   if (ms <= 0) {
     return;
@@ -299,11 +306,29 @@ export async function resolveSubagentCompletionOrigin(params: {
   const requesterConversation: ConversationRef | undefined =
     channel && conversationId ? { channel, accountId, conversationId } : undefined;
 
-  const route = createBoundDeliveryRouter().resolveDestination({
+  const router = createBoundDeliveryRouter();
+  const childRoute = router.resolveDestination({
     eventKind: "task_completion",
     targetSessionKey: params.childSessionKey,
     requester: requesterConversation,
-    failClosed: false,
+    failClosed: true,
+  });
+  if (childRoute.mode === "bound" && childRoute.binding) {
+    return mergeDeliveryContext(
+      resolveBoundConversationOrigin({
+        bindingConversation: childRoute.binding.conversation,
+        requesterConversation,
+        requesterOrigin,
+      }),
+      requesterOrigin,
+    );
+  }
+
+  const route = router.resolveDestination({
+    eventKind: "task_completion",
+    targetSessionKey: params.requesterSessionKey,
+    requester: requesterConversation,
+    failClosed: true,
   });
   if (route.mode === "bound" && route.binding) {
     return mergeDeliveryContext(
@@ -350,7 +375,7 @@ export async function resolveSubagentCompletionOrigin(params: {
 }
 
 async function sendAnnounce(item: AnnounceQueueItem) {
-  const cfg = subagentAnnounceDeliveryDeps.loadConfig();
+  const cfg = subagentAnnounceDeliveryDeps.getRuntimeConfig();
   const announceTimeoutMs = resolveSubagentAnnounceTimeoutMs(cfg);
   const requesterIsSubagent = isInternalAnnounceRequesterSession(item.sessionKey);
   const origin = item.origin;
@@ -395,7 +420,7 @@ async function sendAnnounce(item: AnnounceQueueItem) {
 }
 
 export function loadRequesterSessionEntry(requesterSessionKey: string) {
-  const cfg = subagentAnnounceDeliveryDeps.loadConfig();
+  const cfg = subagentAnnounceDeliveryDeps.getRuntimeConfig();
   const canonicalKey = resolveRequesterStoreKey(cfg, requesterSessionKey);
   const agentId = resolveAgentIdFromSessionKey(canonicalKey);
   const storePath = resolveStorePath(cfg.session?.store, { agentId });
@@ -405,7 +430,7 @@ export function loadRequesterSessionEntry(requesterSessionKey: string) {
 }
 
 export function loadSessionEntryByKey(sessionKey: string) {
-  const cfg = subagentAnnounceDeliveryDeps.loadConfig();
+  const cfg = subagentAnnounceDeliveryDeps.getRuntimeConfig();
   const agentId = resolveAgentIdFromSessionKey(sessionKey);
   const storePath = resolveStorePath(cfg.session?.store, { agentId });
   const store = loadSessionStore(storePath);
@@ -639,7 +664,7 @@ async function sendSubagentAnnounceDirectly(params: {
       path: "none",
     };
   }
-  const cfg = subagentAnnounceDeliveryDeps.loadConfig();
+  const cfg = subagentAnnounceDeliveryDeps.getRuntimeConfig();
   const announceTimeoutMs = resolveSubagentAnnounceTimeoutMs(cfg);
   const canonicalRequesterSessionKey = resolveRequesterStoreKey(
     cfg,
@@ -681,6 +706,10 @@ async function sendSubagentAnnounceDirectly(params: {
       isGatewayMessageChannel(normalizedSessionOnlyOriginChannel)
         ? normalizedSessionOnlyOriginChannel
         : undefined;
+    const completionFallbackText =
+      params.expectsCompletionMessage && deliveryTarget.deliver
+        ? extractThreadCompletionFallbackText(params.internalEvents)
+        : "";
     const requesterActivity = resolveRequesterSessionActivity(canonicalRequesterSessionKey);
     if (params.expectsCompletionMessage && requesterActivity.sessionId) {
       const woke = requesterActivity.sessionId
@@ -696,6 +725,32 @@ async function sendSubagentAnnounceDirectly(params: {
         };
       }
       if (requesterActivity.isActive) {
+        try {
+          const didFallback = await sendCompletionFallback({
+            cfg,
+            channel: deliveryTarget.channel,
+            to: deliveryTarget.to,
+            accountId: deliveryTarget.accountId,
+            threadId: deliveryTarget.threadId,
+            content: completionFallbackText,
+            requesterSessionKey: canonicalRequesterSessionKey,
+            bestEffortDeliver: params.bestEffortDeliver,
+            idempotencyKey: params.directIdempotencyKey,
+            signal: params.signal,
+          });
+          if (didFallback) {
+            return {
+              delivered: true,
+              path: resolveCompletionFallbackPath(deliveryTarget.threadId),
+            };
+          }
+        } catch (err) {
+          return {
+            delivered: false,
+            path: "direct",
+            error: `active requester session could not be woken; fallback send failed: ${summarizeDeliveryError(err)}`,
+          };
+        }
         return {
           delivered: false,
           path: "direct",
@@ -709,10 +764,6 @@ async function sendSubagentAnnounceDirectly(params: {
         path: "none",
       };
     }
-    const completionFallbackText =
-      params.expectsCompletionMessage && deliveryTarget.deliver
-        ? extractThreadCompletionFallbackText(params.internalEvents)
-        : "";
     let directAnnounceResponse: unknown;
     try {
       directAnnounceResponse = await runAnnounceDeliveryWithRetry({
@@ -758,22 +809,33 @@ async function sendSubagentAnnounceDirectly(params: {
           }),
       });
     } catch (err) {
-      const didFallback = await sendCompletionFallback({
-        cfg,
-        channel: deliveryTarget.channel,
-        to: deliveryTarget.to,
-        accountId: deliveryTarget.accountId,
-        threadId: deliveryTarget.threadId,
-        content: deliveryTarget.threadId ? completionFallbackText : "",
-        requesterSessionKey: canonicalRequesterSessionKey,
-        bestEffortDeliver: params.bestEffortDeliver,
-        idempotencyKey: params.directIdempotencyKey,
-        signal: params.signal,
-      });
+      if (isPermanentAnnounceDeliveryError(err)) {
+        throw err;
+      }
+      let didFallback = false;
+      try {
+        didFallback = await sendCompletionFallback({
+          cfg,
+          channel: deliveryTarget.channel,
+          to: deliveryTarget.to,
+          accountId: deliveryTarget.accountId,
+          threadId: deliveryTarget.threadId,
+          content: completionFallbackText,
+          requesterSessionKey: canonicalRequesterSessionKey,
+          bestEffortDeliver: params.bestEffortDeliver,
+          idempotencyKey: params.directIdempotencyKey,
+          signal: params.signal,
+        });
+      } catch (fallbackErr) {
+        throw new Error(
+          `${summarizeDeliveryError(err)}; fallback send failed: ${summarizeDeliveryError(fallbackErr)}`,
+          { cause: fallbackErr },
+        );
+      }
       if (didFallback) {
         return {
           delivered: true,
-          path: "direct-thread-fallback",
+          path: resolveCompletionFallbackPath(deliveryTarget.threadId),
         };
       }
       throw err;
