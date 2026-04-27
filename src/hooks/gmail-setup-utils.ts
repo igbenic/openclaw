@@ -61,6 +61,14 @@ function formatCommand(command: string, args: string[]): string {
   return [command, ...args].join(" ");
 }
 
+function didBackgroundTailscaleCommandSucceed(result: SpawnResult): boolean {
+  if (result.code === 0) {
+    return true;
+  }
+  const output = `${result.stdout}\n${result.stderr}`;
+  return /started and running in the background/i.test(output);
+}
+
 function findExecutablesOnPath(bins: string[]): string[] {
   const pathEnv = process.env.PATH ?? "";
   const parts = pathEnv.split(path.delimiter).filter(Boolean);
@@ -266,6 +274,7 @@ export async function ensureTailscaleEndpoint(params: {
   mode: "off" | "serve" | "funnel";
   path: string;
   port?: number;
+  httpsPort?: number;
   target?: string;
   token?: string;
 }): Promise<string> {
@@ -302,16 +311,26 @@ export async function ensureTailscaleEndpoint(params: {
     throw new Error("tailscale target missing; set a port or target URL");
   }
   const pathArg = normalizeServePath(params.path);
-  const funnelArgs = [params.mode, "--bg", "--set-path", pathArg, "--yes", target];
+  if (params.httpsPort && params.httpsPort !== 443) {
+    await runCommandWithTimeout(["tailscale", params.mode, "--https=443", "off"], {
+      timeoutMs: 30_000,
+    });
+  }
+  const funnelArgs = [params.mode, "--bg", "--set-path", pathArg, "--yes"];
+  if (params.httpsPort) {
+    funnelArgs.push("--https", String(params.httpsPort));
+  }
+  funnelArgs.push(target);
   const funnelCommand = formatCommand("tailscale", funnelArgs);
   const funnelResult = await runCommandWithTimeout(["tailscale", ...funnelArgs], {
     timeoutMs: 30_000,
   });
-  if (funnelResult.code !== 0) {
+  if (!didBackgroundTailscaleCommandSucceed(funnelResult)) {
     throw new Error(formatCommandFailure(funnelCommand, funnelResult));
   }
 
-  const baseUrl = `https://${dnsName}${pathArg}`;
+  const portSuffix = params.httpsPort && params.httpsPort !== 443 ? `:${params.httpsPort}` : "";
+  const baseUrl = `https://${dnsName}${portSuffix}${pathArg}`;
   // Funnel/serve strips pathArg before proxying; keep it only in the public URL.
   return params.token ? `${baseUrl}?token=${params.token}` : baseUrl;
 }

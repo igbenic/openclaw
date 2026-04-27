@@ -16,6 +16,7 @@ import {
   emitGatewayRestart,
   setGatewaySigusr1RestartPolicy,
 } from "../infra/restart.js";
+import { closeActiveMemorySearchManagers } from "../plugins/memory-runtime.js";
 import { setCommandLaneConcurrency, getTotalQueueSize } from "../process/command-queue.js";
 import { CommandLane } from "../process/lanes.js";
 import {
@@ -267,6 +268,10 @@ export function createGatewayReloadHandlers(params: GatewayReloadHandlerParams) 
         onWarn: params.logReload.warn,
         label: "bundle-mcp runtime disposal during config reload",
       });
+    }
+
+    if (plan.closeMemorySearchManagers) {
+      await closeActiveMemorySearchManagers(nextConfig);
     }
 
     if (plan.restartGmailWatcher) {

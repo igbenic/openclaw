@@ -121,4 +121,80 @@ describe("ensureTailscaleEndpoint", () => {
     expect(message).toContain("stdout: not-json");
     expect(message).toContain("code=0");
   });
+
+  it("accepts timed-out background funnel startup when tailscale reports success", async () => {
+    runCommandWithTimeoutMock
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ Self: { DNSName: "host.tailnet.ts.net." } }),
+        stderr: "",
+        code: 0,
+        signal: null,
+        killed: false,
+      })
+      .mockResolvedValueOnce({
+        stdout:
+          "Available on the internet:\n\nhttps://host.tailnet.ts.net/gmail-pubsub\n|-- proxy http://127.0.0.1:8788\n\nFunnel started and running in the background.",
+        stderr: 'Warning: client version "1.96.4" != tailscaled server version "1.96.5"',
+        code: 124,
+        signal: "SIGTERM",
+        killed: true,
+      });
+
+    await expect(
+      ensureTailscaleEndpoint({
+        mode: "funnel",
+        path: "/gmail-pubsub",
+        port: 8788,
+      }),
+    ).resolves.toBe("https://host.tailnet.ts.net/gmail-pubsub");
+  });
+
+  it("uses a configured HTTPS port in tailscale and the public endpoint", async () => {
+    runCommandWithTimeoutMock
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({ Self: { DNSName: "host.tailnet.ts.net." } }),
+        stderr: "",
+        code: 0,
+        signal: null,
+        killed: false,
+      })
+      .mockResolvedValueOnce({
+        stdout: "",
+        stderr: "",
+        code: 0,
+        signal: null,
+        killed: false,
+      })
+      .mockResolvedValueOnce({
+        stdout: "Funnel started and running in the background.",
+        stderr: "",
+        code: 0,
+        signal: null,
+        killed: false,
+      });
+
+    await expect(
+      ensureTailscaleEndpoint({
+        mode: "funnel",
+        path: "/gmail-pubsub",
+        port: 8788,
+        httpsPort: 8443,
+      }),
+    ).resolves.toBe("https://host.tailnet.ts.net:8443/gmail-pubsub");
+
+    expect(runCommandWithTimeoutMock).toHaveBeenLastCalledWith(
+      [
+        "tailscale",
+        "funnel",
+        "--bg",
+        "--set-path",
+        "/gmail-pubsub",
+        "--yes",
+        "--https",
+        "8443",
+        "8788",
+      ],
+      { timeoutMs: 30_000 },
+    );
+  });
 });

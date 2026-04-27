@@ -622,8 +622,13 @@ export function loadPluginManifestRegistry(
         candidate.packageDir ?? candidate.rootDir,
         "package.json",
       );
+      const softSkipHostVersionMismatch =
+        candidate.origin === "bundled" && minHostVersionCheck.kind !== "invalid";
       diagnostics.push({
-        level: minHostVersionCheck.kind === "unknown_host_version" ? "warn" : "error",
+        level:
+          softSkipHostVersionMismatch || minHostVersionCheck.kind === "unknown_host_version"
+            ? "warn"
+            : "error",
         pluginId: manifest.id,
         source: packageManifestSource,
         message:

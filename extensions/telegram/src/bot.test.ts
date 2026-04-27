@@ -1515,6 +1515,9 @@ describe("createTelegramBot", () => {
     const payload = replySpy.mock.calls[0][0];
     expect(payload.Body).toContain("[Quoting Ada id:9001]");
     expect(payload.Body).toContain('"summarize this"');
+    expect(payload.BodyForAgent).toContain("Sure, see below");
+    expect(payload.BodyForAgent).toContain("[Quoting Ada id:9001]");
+    expect(payload.BodyForAgent).toContain('"summarize this"');
     expect(payload.ReplyToId).toBe("9001");
     expect(payload.ReplyToBody).toBe("summarize this");
     expect(payload.ReplyToSender).toBe("Ada");

@@ -157,6 +157,7 @@ export async function startGmailWatcher(cfg: OpenClawConfig): Promise<GmailWatch
         mode: runtimeConfig.tailscale.mode,
         path: runtimeConfig.tailscale.path,
         port: runtimeConfig.serve.port,
+        httpsPort: runtimeConfig.tailscale.httpsPort,
         target: runtimeConfig.tailscale.target,
       });
       log.info(

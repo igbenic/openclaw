@@ -254,6 +254,8 @@ export async function buildTelegramInboundContextPayload(params: {
           : ""
       }]\n`
     : "";
+  const bodyForAgent =
+    forwardPrefix || replySuffix ? `${forwardPrefix}${bodyText}${replySuffix}` : bodyText;
   const groupLabel = isGroup ? buildGroupLabel(msg, chatId, resolvedThreadId) : undefined;
   const senderName = buildSenderName(msg);
   const conversationLabel = isGroup
@@ -323,7 +325,7 @@ export async function buildTelegramInboundContextPayload(params: {
   const contextMedia = [...currentMediaForContext, ...replyMedia];
   const ctxPayload = sessionRuntime.finalizeInboundContext({
     Body: combinedBody,
-    BodyForAgent: bodyText,
+    BodyForAgent: bodyForAgent,
     InboundHistory: inboundHistory,
     RawBody: rawBody,
     CommandBody: commandBody,

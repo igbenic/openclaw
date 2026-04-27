@@ -20,6 +20,7 @@ export type GatewayReloadPlan = {
   restartHealthMonitor: boolean;
   restartChannels: Set<ChannelKind>;
   disposeMcpRuntimes: boolean;
+  closeMemorySearchManagers?: boolean;
   noopPaths: string[];
 };
 
@@ -36,6 +37,7 @@ type ReloadAction =
   | "restart-heartbeat"
   | "restart-health-monitor"
   | "dispose-mcp-runtimes"
+  | "close-memory-search-managers"
   | `restart-channel:${ChannelId}`;
 
 export type GatewayReloadPlanOptions = {
@@ -74,6 +76,11 @@ const BASE_RELOAD_RULES: ReloadRule[] = [
     prefix: "agents.defaults.models",
     kind: "hot",
     actions: ["restart-heartbeat"],
+  },
+  {
+    prefix: "agents.defaults.memorySearch",
+    kind: "hot",
+    actions: ["close-memory-search-managers"],
   },
   {
     prefix: "agents.defaults.model",
@@ -311,6 +318,9 @@ export function buildGatewayReloadPlan(
         break;
       case "dispose-mcp-runtimes":
         plan.disposeMcpRuntimes = true;
+        break;
+      case "close-memory-search-managers":
+        plan.closeMemorySearchManagers = true;
         break;
       default:
         break;

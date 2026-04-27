@@ -133,6 +133,7 @@ export const HooksGmailSchema = z
       .object({
         mode: z.union([z.literal("off"), z.literal("serve"), z.literal("funnel")]).optional(),
         path: z.string().optional(),
+        httpsPort: z.number().int().positive().optional(),
         target: z.string().optional(),
       })
       .strict()

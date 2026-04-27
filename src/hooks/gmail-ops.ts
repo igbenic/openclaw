@@ -60,6 +60,7 @@ type GmailCommonOptions = {
   renewEveryMinutes?: number;
   tailscale?: "off" | "serve" | "funnel";
   tailscalePath?: string;
+  tailscaleHttpsPort?: number;
   tailscaleTarget?: string;
 };
 
@@ -179,6 +180,7 @@ export async function runGmailSetup(opts: GmailSetupOptions) {
         mode: tailscaleMode,
         path: tailscalePath,
         port: servePort,
+        httpsPort: opts.tailscaleHttpsPort ?? baseConfig.hooks?.gmail?.tailscale?.httpsPort,
         target: normalizedTailscaleTarget,
         token: pushToken,
       });
@@ -227,6 +229,7 @@ export async function runGmailSetup(opts: GmailSetupOptions) {
           ...baseConfig.hooks?.gmail?.tailscale,
           mode: tailscaleMode,
           path: tailscalePath,
+          httpsPort: opts.tailscaleHttpsPort ?? baseConfig.hooks?.gmail?.tailscale?.httpsPort,
           target: normalizedTailscaleTarget,
         },
       },
@@ -305,6 +308,7 @@ export async function runGmailService(opts: GmailRunOptions) {
       mode: runtimeConfig.tailscale.mode,
       path: runtimeConfig.tailscale.path,
       port: runtimeConfig.serve.port,
+      httpsPort: runtimeConfig.tailscale.httpsPort,
       target: runtimeConfig.tailscale.target,
     });
   }

@@ -33,6 +33,7 @@ export type GmailHookOverrides = {
   servePath?: string;
   tailscaleMode?: HooksGmailTailscaleMode;
   tailscalePath?: string;
+  tailscaleHttpsPort?: number;
   tailscaleTarget?: string;
 };
 
@@ -55,6 +56,7 @@ export type GmailHookRuntimeConfig = {
   tailscale: {
     mode: HooksGmailTailscaleMode;
     path: string;
+    httpsPort?: number;
     target?: string;
   };
 };
@@ -178,6 +180,14 @@ export function resolveGmailHookRuntimeConfig(
       ? (tailscalePathRaw ?? normalizedServePathRaw)
       : (tailscalePathRaw ?? servePath),
   );
+  const tailscaleHttpsPortRaw = overrides.tailscaleHttpsPort ?? gmail?.tailscale?.httpsPort;
+  const tailscaleHttpsPort =
+    tailscaleMode !== "off" &&
+    typeof tailscaleHttpsPortRaw === "number" &&
+    Number.isFinite(tailscaleHttpsPortRaw) &&
+    tailscaleHttpsPortRaw > 0
+      ? Math.floor(tailscaleHttpsPortRaw)
+      : undefined;
 
   return {
     ok: true,
@@ -200,6 +210,7 @@ export function resolveGmailHookRuntimeConfig(
       tailscale: {
         mode: tailscaleMode,
         path: tailscalePath,
+        httpsPort: tailscaleHttpsPort,
         target: tailscaleTarget,
       },
     },

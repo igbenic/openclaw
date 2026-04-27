@@ -729,6 +729,13 @@ export function registerShortTermPromotionDreaming(api: OpenClawPluginApi): void
         // Ignore — fall through with cron = null
       }
     }
+    const hasGatewayCronContext = Boolean(resolveStartupCron || gatewayContext);
+    if (!cron && params.reason === "runtime" && !hasGatewayCronContext) {
+      api.logger.debug?.(
+        "memory-core: skipping managed dreaming cron reconciliation outside gateway runtime (no gateway cron context).",
+      );
+      return config;
+    }
     const configKey = runtimeConfigKey(config);
     if (!cron && config.enabled && !unavailableCronWarningEmitted) {
       // Avoid a noisy startup-path warning when the gateway has not exposed cron yet.

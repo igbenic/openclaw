@@ -1325,6 +1325,53 @@ describe("gateway startup reconciliation", () => {
     }
   });
 
+  it("skips managed dreaming cron reconciliation in isolated runtime contexts without gateway_start", async () => {
+    clearInternalHooks();
+    const logger = createLogger();
+    const onMock = vi.fn();
+    const api: DreamingPluginApiTestDouble = {
+      config: {
+        plugins: {
+          entries: {
+            "memory-core": {
+              config: {
+                dreaming: {
+                  enabled: true,
+                  frequency: "15 4 * * *",
+                  timezone: "UTC",
+                },
+              },
+            },
+          },
+        },
+      },
+      pluginConfig: {},
+      logger,
+      runtime: {},
+      on: onMock,
+    };
+
+    try {
+      registerShortTermPromotionDreamingForTest(api);
+      const beforeAgentReply = getBeforeAgentReplyHandler(onMock);
+      await beforeAgentReply(
+        { cleanedBody: "" },
+        { trigger: "cron", workspaceDir: ".", sessionKey: "agent:main:cron:test" },
+      );
+
+      expect(logger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining("cron service unavailable"),
+      );
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "skipping managed dreaming cron reconciliation outside gateway runtime",
+        ),
+      );
+    } finally {
+      clearInternalHooks();
+    }
+  });
+
   it("uses live runtime config for heartbeat dreaming reconciliation", async () => {
     clearInternalHooks();
     const logger = createLogger();

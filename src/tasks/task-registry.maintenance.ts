@@ -344,14 +344,74 @@ function hasBackingSession(task: TaskRecord): boolean {
   return true;
 }
 
-function shouldMarkLost(task: TaskRecord, now: number): boolean {
+function findSupersededActiveTaskIds(tasks: Iterable<TaskRecord>): Set<string> {
+  const latestTerminalTaskBySessionKey = new Map<string, TaskRecord>();
+
+  for (const task of tasks) {
+    if (task.runtime !== "acp") {
+      continue;
+    }
+    const childSessionKey = task.childSessionKey?.trim();
+    if (!childSessionKey || isActiveTask(task)) {
+      continue;
+    }
+    const current = latestTerminalTaskBySessionKey.get(childSessionKey);
+    if (!current || task.createdAt > current.createdAt) {
+      latestTerminalTaskBySessionKey.set(childSessionKey, task);
+    }
+  }
+
+  const supersededTaskIds = new Set<string>();
+  for (const task of tasks) {
+    if (task.runtime !== "acp" || !isActiveTask(task)) {
+      continue;
+    }
+    const childSessionKey = task.childSessionKey?.trim();
+    if (!childSessionKey) {
+      continue;
+    }
+    const latestTerminalTask = latestTerminalTaskBySessionKey.get(childSessionKey);
+    if (!latestTerminalTask) {
+      continue;
+    }
+    if (latestTerminalTask.createdAt <= task.createdAt) {
+      continue;
+    }
+    if (latestTerminalTask.requesterSessionKey !== task.requesterSessionKey) {
+      continue;
+    }
+    supersededTaskIds.add(task.taskId);
+  }
+
+  return supersededTaskIds;
+}
+
+function getTaskLossReason(
+  task: TaskRecord,
+  now: number,
+  supersededTaskIds: ReadonlySet<string>,
+): string | undefined {
   if (!isActiveTask(task)) {
-    return false;
+    return undefined;
   }
   if (!hasLostGraceExpired(task, now)) {
-    return false;
+    return undefined;
   }
-  return !hasBackingSession(task);
+  if (!hasBackingSession(task)) {
+    return "backing session missing";
+  }
+  if (supersededTaskIds.has(task.taskId)) {
+    return "superseded by later task on same backing session";
+  }
+  return undefined;
+}
+
+function shouldMarkLost(
+  task: TaskRecord,
+  now: number,
+  supersededTaskIds: ReadonlySet<string>,
+): boolean {
+  return getTaskLossReason(task, now, supersededTaskIds) !== undefined;
 }
 
 function shouldPruneTerminalTask(task: TaskRecord, now: number): boolean {
@@ -374,14 +434,18 @@ function resolveCleanupAfter(task: TaskRecord): number {
   return terminalAt + TASK_RETENTION_MS;
 }
 
-function markTaskLost(task: TaskRecord, now: number): TaskRecord {
+function markTaskLost(
+  task: TaskRecord,
+  now: number,
+  reason = "backing session missing",
+): TaskRecord {
   const cleanupAfter = task.cleanupAfter ?? projectTaskLost(task, now).cleanupAfter;
   const updated =
     taskRegistryMaintenanceRuntime.markTaskLostById({
       taskId: task.taskId,
       endedAt: task.endedAt ?? now,
       lastEventAt: now,
-      error: task.error ?? "backing session missing",
+      error: task.error ?? reason,
       cleanupAfter,
     }) ?? task;
   void taskRegistryMaintenanceRuntime.maybeDeliverTaskTerminalUpdate(updated.taskId);
@@ -442,13 +506,14 @@ function projectTaskLost(task: TaskRecord, now: number): TaskRecord {
 export function reconcileTaskRecordForOperatorInspection(
   task: TaskRecord,
   context: CronRecoveryContext = createCronRecoveryContext(),
+  supersededTaskIds: ReadonlySet<string> = new Set(),
 ): TaskRecord {
   const cronRecovery = resolveDurableCronTaskRecovery(task, context);
   if (cronRecovery) {
     return projectTaskRecovered(task, cronRecovery);
   }
   const now = Date.now();
-  if (!shouldMarkLost(task, now)) {
+  if (!shouldMarkLost(task, now, supersededTaskIds)) {
     return task;
   }
   return projectTaskLost(task, now);
@@ -457,9 +522,11 @@ export function reconcileTaskRecordForOperatorInspection(
 export function reconcileInspectableTasks(): TaskRecord[] {
   taskRegistryMaintenanceRuntime.ensureTaskRegistryReady();
   const cronRecoveryContext = createCronRecoveryContext();
-  return taskRegistryMaintenanceRuntime
-    .listTaskRecords()
-    .map((task) => reconcileTaskRecordForOperatorInspection(task, cronRecoveryContext));
+  const tasks = taskRegistryMaintenanceRuntime.listTaskRecords();
+  const supersededTaskIds = findSupersededActiveTaskIds(tasks);
+  return tasks.map((task) =>
+    reconcileTaskRecordForOperatorInspection(task, cronRecoveryContext, supersededTaskIds),
+  );
 }
 
 configureTaskAuditTaskProvider(reconcileInspectableTasks);
@@ -490,12 +557,14 @@ export function previewTaskRegistryMaintenance(): TaskRegistryMaintenanceSummary
   let cleanupStamped = 0;
   let pruned = 0;
   const cronRecoveryContext = createCronRecoveryContext();
-  for (const task of taskRegistryMaintenanceRuntime.listTaskRecords()) {
+  const tasks = taskRegistryMaintenanceRuntime.listTaskRecords();
+  const supersededTaskIds = findSupersededActiveTaskIds(tasks);
+  for (const task of tasks) {
     if (resolveDurableCronTaskRecovery(task, cronRecoveryContext)) {
       recovered += 1;
       continue;
     }
-    if (shouldMarkLost(task, now)) {
+    if (shouldMarkLost(task, now, supersededTaskIds)) {
       reconciled += 1;
       continue;
     }
@@ -538,6 +607,7 @@ export async function runTaskRegistryMaintenance(): Promise<TaskRegistryMaintena
   let cleanupStamped = 0;
   let pruned = 0;
   const tasks = taskRegistryMaintenanceRuntime.listTaskRecords();
+  const supersededTaskIds = findSupersededActiveTaskIds(tasks);
   const cronRecoveryContext = createCronRecoveryContext();
   let processed = 0;
   for (const task of tasks) {
@@ -557,7 +627,8 @@ export async function runTaskRegistryMaintenance(): Promise<TaskRegistryMaintena
       }
       continue;
     }
-    if (shouldMarkLost(current, now)) {
+    const lossReason = getTaskLossReason(current, now, supersededTaskIds);
+    if (lossReason) {
       const recovery = await tryRecoverTaskBeforeMarkLost({
         taskId: current.taskId,
         runtime: current.runtime,
@@ -565,7 +636,10 @@ export async function runTaskRegistryMaintenance(): Promise<TaskRegistryMaintena
         now,
       });
       const freshAfterHook = taskRegistryMaintenanceRuntime.getTaskById(current.taskId);
-      if (!freshAfterHook || !shouldMarkLost(freshAfterHook, now)) {
+      const freshLossReason = freshAfterHook
+        ? getTaskLossReason(freshAfterHook, now, supersededTaskIds)
+        : undefined;
+      if (!freshAfterHook || !freshLossReason) {
         processed += 1;
         if (processed % SWEEP_YIELD_BATCH_SIZE === 0) {
           await yieldToEventLoop();
@@ -580,7 +654,7 @@ export async function runTaskRegistryMaintenance(): Promise<TaskRegistryMaintena
         }
         continue;
       }
-      const next = markTaskLost(freshAfterHook, now);
+      const next = markTaskLost(freshAfterHook, now, freshLossReason);
       if (next.status === "lost") {
         reconciled += 1;
       }

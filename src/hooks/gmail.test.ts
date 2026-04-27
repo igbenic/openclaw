@@ -41,7 +41,7 @@ describe("gmail hook config", () => {
 
   function expectResolvedPaths(
     result: ReturnType<typeof resolveGmailHookRuntimeConfig>,
-    expected: { servePath: string; publicPath: string; target?: string },
+    expected: { servePath: string; publicPath: string; httpsPort?: number; target?: string },
   ) {
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -49,6 +49,9 @@ describe("gmail hook config", () => {
     }
     expect(result.value.serve.path).toBe(expected.servePath);
     expect(result.value.tailscale.path).toBe(expected.publicPath);
+    if (expected.httpsPort !== undefined) {
+      expect(result.value.tailscale.httpsPort).toBe(expected.httpsPort);
+    }
     if (expected.target !== undefined) {
       expect(result.value.tailscale.target).toBe(expected.target);
     }
@@ -155,5 +158,16 @@ describe("gmail hook config", () => {
       tailscale: { mode: "funnel", target },
     });
     expectResolvedPaths(result, { servePath: "/custom", publicPath: "/custom", target });
+  });
+
+  it("keeps configured tailscale HTTPS port", () => {
+    const result = resolveWithGmailOverrides({
+      tailscale: { mode: "funnel", httpsPort: 8443 },
+    });
+    expectResolvedPaths(result, {
+      servePath: "/",
+      publicPath: "/gmail-pubsub",
+      httpsPort: 8443,
+    });
   });
 });

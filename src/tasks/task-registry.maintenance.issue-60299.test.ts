@@ -341,6 +341,52 @@ describe("task-registry maintenance issue #60299", () => {
     expect(currentTasks.get(task.taskId)).toMatchObject({ status: "running" });
   });
 
+  it("marks stale acp tasks lost when a later terminal task exists on the same backing session", async () => {
+    const childSessionKey = "agent:codex:acp:session-1";
+    const staleTask = makeStaleTask({
+      taskId: "acp-stale-task",
+      runtime: "acp",
+      requesterSessionKey: "agent:main:telegram:direct:7860943228",
+      childSessionKey,
+    });
+    const laterTerminalTask = {
+      ...makeStaleTask({
+        taskId: "acp-terminal-task",
+        runtime: "acp",
+        requesterSessionKey: staleTask.requesterSessionKey,
+        childSessionKey,
+      }),
+      status: "succeeded" as const,
+      createdAt: Date.now() - 60_000,
+      startedAt: Date.now() - 60_000,
+      lastEventAt: Date.now() - 30_000,
+      endedAt: Date.now() - 30_000,
+      cleanupAfter: Date.now() + 60_000,
+    };
+
+    const { currentTasks } = createTaskRegistryMaintenanceHarness({
+      tasks: [staleTask, laterTerminalTask],
+      acpEntry: {
+        sessionId: childSessionKey,
+        sessionKey: childSessionKey,
+        createdAt: Date.now() - GRACE_EXPIRED_MS,
+        updatedAt: Date.now() - 1_000,
+      } as never,
+    });
+
+    expect(reconcileInspectableTasks()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ taskId: staleTask.taskId, status: "lost" }),
+      ]),
+    );
+    expect(previewTaskRegistryMaintenance()).toMatchObject({ reconciled: 1 });
+    expect(await runTaskRegistryMaintenance()).toMatchObject({ reconciled: 1 });
+    expect(currentTasks.get(staleTask.taskId)).toMatchObject({
+      status: "lost",
+      error: "superseded by later task on same backing session",
+    });
+  });
+
   it("skips markTaskLost and counts recovered when recovery hook recovers a stale task", async () => {
     const task = makeStaleTask({
       runtime: "cron",

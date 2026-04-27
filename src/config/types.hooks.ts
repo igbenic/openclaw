@@ -57,6 +57,8 @@ export type HooksGmailConfig = {
   tailscale?: {
     mode?: HooksGmailTailscaleMode;
     path?: string;
+    /** Optional public HTTPS port for tailscale serve/funnel. Defaults to Tailscale's 443. */
+    httpsPort?: number;
     /** Optional tailscale serve/funnel target (port, host:port, or full URL). */
     target?: string;
   };

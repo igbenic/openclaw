@@ -56,6 +56,7 @@ export function registerWebhooksCli(program: Command) {
     )
     .option("--tailscale <mode>", "Expose push endpoint via tailscale (funnel|serve|off)", "funnel")
     .option("--tailscale-path <path>", "Path for tailscale serve/funnel")
+    .option("--tailscale-https-port <n>", "Public HTTPS port for tailscale serve/funnel")
     .option(
       "--tailscale-target <target>",
       "Tailscale serve/funnel target (port, host:port, or URL)",
@@ -90,6 +91,7 @@ export function registerWebhooksCli(program: Command) {
     .option("--renew-minutes <n>", "Renew watch every N minutes")
     .option("--tailscale <mode>", "Expose push endpoint via tailscale (funnel|serve|off)")
     .option("--tailscale-path <path>", "Path for tailscale serve/funnel")
+    .option("--tailscale-https-port <n>", "Public HTTPS port for tailscale serve/funnel")
     .option(
       "--tailscale-target <target>",
       "Tailscale serve/funnel target (port, host:port, or URL)",
@@ -145,6 +147,7 @@ function parseGmailCommonOptions(raw: Record<string, unknown>) {
     renewEveryMinutes: numberOption(raw.renewMinutes),
     tailscaleRaw: normalizeOptionalString(raw.tailscale),
     tailscalePath: normalizeOptionalString(raw.tailscalePath),
+    tailscaleHttpsPort: numberOption(raw.tailscaleHttpsPort),
     tailscaleTarget: normalizeOptionalString(raw.tailscaleTarget),
   };
 }
@@ -167,6 +170,7 @@ function gmailOptionsFromCommon(
     renewEveryMinutes: common.renewEveryMinutes,
     tailscale: common.tailscaleRaw as GmailRunOptions["tailscale"],
     tailscalePath: common.tailscalePath,
+    tailscaleHttpsPort: common.tailscaleHttpsPort,
     tailscaleTarget: common.tailscaleTarget,
   };
 }

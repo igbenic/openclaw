@@ -172,6 +172,7 @@ function loadRegistryForMinHostVersionCase(params: {
   rootDir: string;
   minHostVersion: string;
   env?: NodeJS.ProcessEnv;
+  origin?: "bundled" | "global" | "workspace" | "config";
 }) {
   return loadPluginManifestRegistry({
     cache: false,
@@ -181,7 +182,7 @@ function loadRegistryForMinHostVersionCase(params: {
         idHint: "synology-chat",
         rootDir: params.rootDir,
         packageDir: params.rootDir,
-        origin: "global",
+        origin: params.origin ?? "global",
         packageManifest: {
           install: {
             npmSpec: "@openclaw/synology-chat",
@@ -1241,6 +1242,30 @@ describe("loadPluginManifestRegistry", () => {
     if (expectWarn) {
       expect(registry.diagnostics.some((diag) => diag.level === "warn")).toBe(true);
     }
+  });
+
+  it("soft-skips bundled plugins whose minHostVersion is newer than the current host", () => {
+    const dir = makeTempDir();
+    writeManifest(dir, { id: "synology-chat", configSchema: { type: "object" } });
+
+    const registry = loadRegistryForMinHostVersionCase({
+      rootDir: dir,
+      origin: "bundled",
+      minHostVersion: ">=2026.3.22",
+      env: { OPENCLAW_VERSION: "2026.3.21" } as NodeJS.ProcessEnv,
+    });
+
+    expect(registry.plugins).toEqual([]);
+    expect(registry.diagnostics).toContainEqual(
+      expect.objectContaining({
+        level: "warn",
+        pluginId: "synology-chat",
+        message: expect.stringContaining(
+          "plugin requires OpenClaw >=2026.3.22, but this host is 2026.3.21",
+        ),
+      }),
+    );
+    expect(registry.diagnostics.some((diag) => diag.level === "error")).toBe(false);
   });
 
   it.each([
