@@ -116,6 +116,10 @@ function resolveBindingKey(params: { accountId: string; conversationId: string }
   return `${params.accountId}:${params.conversationId}`;
 }
 
+function isBareTelegramDirectConversationId(conversationId: string): boolean {
+  return /^[1-9]\d*$/u.test(conversationId.trim());
+}
+
 function toSessionBindingTargetKind(raw: TelegramBindingTargetKind): BindingTargetKind {
   return raw === "subagent" ? "subagent" : "session";
 }
@@ -257,6 +261,12 @@ function loadBindingsFromDisk(accountId: string): TelegramThreadBindingRecord[] 
       const targetSessionKey = normalizeOptionalString(entry?.targetSessionKey) ?? "";
       const targetKind = entry?.targetKind === "subagent" ? "subagent" : "acp";
       if (!conversationId || !targetSessionKey) {
+        continue;
+      }
+      if (isBareTelegramDirectConversationId(conversationId)) {
+        logVerbose(
+          `telegram thread bindings: ignoring bare direct-message binding ${conversationId}`,
+        );
         continue;
       }
       const boundAt =
@@ -501,7 +511,7 @@ export function createTelegramThreadBindingManager(params: {
     getMaxAgeMs: () => maxAgeMs,
     getByConversationId: (conversationIdRaw) => {
       const conversationId = normalizeOptionalString(conversationIdRaw);
-      if (!conversationId) {
+      if (!conversationId || isBareTelegramDirectConversationId(conversationId)) {
         return undefined;
       }
       return getThreadBindingsState().bindingsByAccountConversation.get(
@@ -670,6 +680,12 @@ export function createTelegramThreadBindingManager(params: {
       if (!conversationId) {
         return null;
       }
+      if (isBareTelegramDirectConversationId(conversationId)) {
+        logVerbose(
+          `telegram: refusing to bind bare direct-message conversation ${conversationId} to ${targetSessionKey}`,
+        );
+        return null;
+      }
       const record = fromSessionBindingInput({
         accountId,
         input: {
@@ -719,7 +735,7 @@ export function createTelegramThreadBindingManager(params: {
         return null;
       }
       const conversationId = normalizeOptionalString(ref.conversationId);
-      if (!conversationId) {
+      if (!conversationId || isBareTelegramDirectConversationId(conversationId)) {
         return null;
       }
       const record = manager.getByConversationId(conversationId);

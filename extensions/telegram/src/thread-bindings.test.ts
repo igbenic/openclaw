@@ -117,6 +117,30 @@ describe("telegram thread bindings", () => {
     expect(manager.getByConversationId("-100200300:topic:77")?.boundBy).toBe("user-1");
   });
 
+  it("rejects current bindings for bare direct-message conversations", async () => {
+    const manager = createTelegramThreadBindingManager({
+      accountId: "work",
+      persist: false,
+      enableSweeper: false,
+    });
+
+    await expect(
+      getSessionBindingService().bind({
+        targetSessionKey: "agent:codex:acp:dm-hijack",
+        targetKind: "session",
+        conversation: {
+          channel: "telegram",
+          accountId: "work",
+          conversationId: "8460800771",
+        },
+        placement: "current",
+      }),
+    ).rejects.toThrow("Session binding adapter failed to bind target conversation");
+
+    expect(manager.getByConversationId("8460800771")).toBeUndefined();
+    expect(manager.listBindings()).toHaveLength(0);
+  });
+
   it("rejects child placement when conversationId is a bare topic ID with no group context", async () => {
     createTelegramThreadBindingManager({
       accountId: "default",
@@ -228,7 +252,7 @@ describe("telegram thread bindings", () => {
       conversation: {
         channel: "telegram",
         accountId: "work",
-        conversationId: "1234",
+        conversationId: "-100200300:topic:44",
       },
     });
     const original = manager.listBySessionKey("agent:main:subagent:child-1")[0];
@@ -314,7 +338,7 @@ describe("telegram thread bindings", () => {
       conversation: {
         channel: "telegram",
         accountId: "default",
-        conversationId: "8460800771",
+        conversationId: "-100200300:topic:99",
       },
     });
 
@@ -331,7 +355,43 @@ describe("telegram thread bindings", () => {
       enableSweeper: false,
     });
 
+    expect(reloaded.getByConversationId("-100200300:topic:99")).toBeUndefined();
+  });
+
+  it("ignores persisted bare direct-message bindings on reload", async () => {
+    stateDirOverride = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-telegram-bindings-"));
+    process.env.OPENCLAW_STATE_DIR = stateDirOverride;
+    const statePath = path.join(
+      resolveStateDir(process.env, os.homedir),
+      "telegram",
+      "thread-bindings-default.json",
+    );
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        bindings: [
+          {
+            accountId: "default",
+            conversationId: "8460800771",
+            targetSessionKey: "agent:codex:acp:dm-hijack",
+            targetKind: "acp",
+            boundAt: 1,
+            lastActivityAt: 1,
+          },
+        ],
+      }),
+    );
+
+    const reloaded = createTelegramThreadBindingManager({
+      accountId: "default",
+      persist: true,
+      enableSweeper: false,
+    });
+
     expect(reloaded.getByConversationId("8460800771")).toBeUndefined();
+    expect(reloaded.listBindings()).toHaveLength(0);
   });
 
   it("cleans up stale ACP bindings before restart routing can reuse them", async () => {

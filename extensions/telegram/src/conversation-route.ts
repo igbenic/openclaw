@@ -105,12 +105,10 @@ export function resolveTelegramConversationRoute(params: {
   let configuredBindingSessionKey = configuredRoute.boundSessionKey ?? "";
   route = configuredRoute.route;
 
+  // Only scoped Telegram conversations should be runtime-bound to spawned sessions.
+  // Binding the bare direct chat lets a background ACP session capture normal DMs.
   const threadBindingConversationId =
-    params.replyThreadId != null
-      ? `${params.chatId}:topic:${params.replyThreadId}`
-      : !params.isGroup
-        ? String(params.chatId)
-        : undefined;
+    params.replyThreadId != null ? `${params.chatId}:topic:${params.replyThreadId}` : undefined;
   if (threadBindingConversationId) {
     const runtimeRoute = resolveRuntimeConversationBindingRoute({
       route,
