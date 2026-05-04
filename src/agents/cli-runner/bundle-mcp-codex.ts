@@ -54,6 +54,7 @@ export function injectCodexMcpConfigArgs(
   args: string[] | undefined,
   config: BundleMcpConfig,
 ): string[] {
+  const baseArgs = ensureCodexUserConfigIgnored(args ?? []);
   const overrides = serializeTomlInlineValue(
     Object.fromEntries(
       Object.entries(config.mcpServers).map(([name, server]) => [
@@ -62,5 +63,21 @@ export function injectCodexMcpConfigArgs(
       ]),
     ),
   );
-  return [...(args ?? []), "-c", `mcp_servers=${overrides}`];
+  return [...baseArgs, "-c", `mcp_servers=${overrides}`];
+}
+
+function ensureCodexUserConfigIgnored(args: string[]): string[] {
+  if (args.includes("--ignore-user-config")) {
+    return args;
+  }
+  if (args[0] !== "exec") {
+    return [...args, "--ignore-user-config"];
+  }
+
+  const subcommand = args[1];
+  if (subcommand === "resume" || subcommand === "review") {
+    return [args[0], subcommand, "--ignore-user-config", ...args.slice(2)];
+  }
+
+  return [args[0], "--ignore-user-config", ...args.slice(1)];
 }

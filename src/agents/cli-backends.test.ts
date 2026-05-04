@@ -281,6 +281,7 @@ beforeEach(() => {
         command: "codex",
         args: [
           "exec",
+          "--ignore-user-config",
           "--json",
           "--color",
           "never",
@@ -293,6 +294,7 @@ beforeEach(() => {
         resumeArgs: [
           "exec",
           "resume",
+          "--ignore-user-config",
           "{sessionId}",
           "-c",
           'sandbox_mode="workspace-write"',
@@ -379,6 +381,7 @@ describe("resolveCliBackendConfig reliability merge", () => {
     expect(resolved).not.toBeNull();
     expect(resolved?.config.args).toEqual([
       "exec",
+      "--ignore-user-config",
       "--json",
       "--color",
       "never",
@@ -391,6 +394,7 @@ describe("resolveCliBackendConfig reliability merge", () => {
     expect(resolved?.config.resumeArgs).toEqual([
       "exec",
       "resume",
+      "--ignore-user-config",
       "{sessionId}",
       "-c",
       'sandbox_mode="workspace-write"',

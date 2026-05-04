@@ -258,8 +258,8 @@ Input modes:
 The bundled OpenAI plugin also registers a default for `codex-cli`:
 
 - `command: "codex"`
-- `args: ["exec","--json","--color","never","--sandbox","workspace-write","--skip-git-repo-check"]`
-- `resumeArgs: ["exec","resume","{sessionId}","-c","sandbox_mode=\"workspace-write\"","--skip-git-repo-check"]`
+- `args: ["exec","--ignore-user-config","--json","--color","never","--sandbox","workspace-write","--skip-git-repo-check"]`
+- `resumeArgs: ["exec","resume","--ignore-user-config","{sessionId}","-c","sandbox_mode=\"workspace-write\"","--skip-git-repo-check"]`
 - `output: "jsonl"`
 - `resumeOutput: "text"`
 - `modelArg: "--model"`
@@ -336,7 +336,10 @@ Current bundled behavior:
 - `claude-cli`: generated strict MCP config file
 - `codex-cli`: inline config overrides for `mcp_servers`; the generated
   OpenClaw loopback server is marked with Codex's per-server tool approval mode
-  so MCP calls cannot stall on local approval prompts
+  so MCP calls cannot stall on local approval prompts. OpenClaw also adds
+  Codex's `--ignore-user-config` flag so user-level Codex MCP servers are not
+  spawned by OpenClaw-managed background runs; Codex auth still comes from
+  `CODEX_HOME`.
 - `google-gemini-cli`: generated Gemini system settings file
 
 When bundle MCP is enabled, OpenClaw:

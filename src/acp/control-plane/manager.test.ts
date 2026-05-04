@@ -2846,10 +2846,9 @@ describe("AcpSessionManager", () => {
         value: "strict",
       }),
     );
-    expect(runtimeState.setConfigOption).toHaveBeenCalledWith(
+    expect(runtimeState.setConfigOption).not.toHaveBeenCalledWith(
       expect.objectContaining({
         key: "timeout",
-        value: "120",
       }),
     );
   });
@@ -2956,6 +2955,63 @@ describe("AcpSessionManager", () => {
       }),
     ).rejects.toMatchObject({
       code: "ACP_BACKEND_UNSUPPORTED_CONTROL",
+    });
+  });
+
+  it("stores timeout runtime options without requiring backend set_config_option support", async () => {
+    const runtimeState = createRuntime();
+    const getCapabilities = vi.fn(async () => ({ controls: [] }));
+    const unsupportedRuntime: AcpRuntime = {
+      ensureSession: runtimeState.ensureSession as AcpRuntime["ensureSession"],
+      runTurn: runtimeState.runTurn as AcpRuntime["runTurn"],
+      getCapabilities,
+      cancel: runtimeState.cancel as AcpRuntime["cancel"],
+      close: runtimeState.close as AcpRuntime["close"],
+    };
+    hoisted.requireAcpRuntimeBackendMock.mockReturnValue({
+      id: "acpx",
+      runtime: unsupportedRuntime,
+    });
+    const sessionKey = "agent:codex:acp:session-timeout";
+    let currentEntry: { sessionKey: string; storeSessionKey: string; acp: SessionAcpMeta } = {
+      sessionKey,
+      storeSessionKey: sessionKey,
+      acp: readySessionMeta(),
+    };
+    hoisted.readAcpSessionEntryMock.mockImplementation(() => currentEntry);
+    hoisted.upsertAcpSessionMetaMock.mockImplementation((paramsUnknown: unknown) => {
+      const params = paramsUnknown as {
+        mutate: (
+          current: SessionAcpMeta | undefined,
+          entry: { acp?: SessionAcpMeta } | undefined,
+        ) => SessionAcpMeta | null | undefined;
+      };
+      const nextMeta = params.mutate(currentEntry.acp, currentEntry);
+      if (nextMeta) {
+        currentEntry = {
+          ...currentEntry,
+          acp: nextMeta,
+        };
+      }
+      return currentEntry;
+    });
+
+    const manager = new AcpSessionManager();
+    await expect(
+      manager.setSessionConfigOption({
+        cfg: baseCfg,
+        sessionKey,
+        key: "timeout",
+        value: "60",
+      }),
+    ).resolves.toEqual({
+      timeoutSeconds: 60,
+    });
+
+    expect(getCapabilities).not.toHaveBeenCalled();
+    expect(runtimeState.setConfigOption).not.toHaveBeenCalled();
+    expect(currentEntry.acp.runtimeOptions).toEqual({
+      timeoutSeconds: 60,
     });
   });
 

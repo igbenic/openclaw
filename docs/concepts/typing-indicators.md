@@ -71,6 +71,10 @@ You can override mode or cadence per session:
   channel does not support typing.
 - `typingIntervalSeconds` controls the **refresh cadence**, not the start time.
   The default is 6 seconds.
+- Long-running active replies keep refreshing typing beyond the internal
+  activity watchdog. Completion, errors, silent replies, and dispatcher idle
+  cleanup stop typing normally; if a typing loop stays active without new
+  run activity for an extended period, OpenClaw stops it as a leak guard.
 
 ## Related
 

@@ -181,6 +181,15 @@ Codex after changing config.
   not affect normal harness startup.
 - Codex auth available to the app-server process.
 
+By default, OpenClaw starts the managed Codex app-server with
+`-c mcp_servers={}`. This keeps user-level Codex MCP servers from
+`$CODEX_HOME/config.toml` out of OpenClaw-managed gateway, cron, and agent
+runs, while Codex auth still comes from the normal Codex auth store. If you
+intentionally need Codex app-server MCP servers, configure
+`plugins.entries.codex.config.appServer.args` with an explicit `mcp_servers`
+override. The opt-in Computer Use setup leaves Codex MCP loading available
+because it relies on a Codex-managed MCP server.
+
 The plugin blocks older or unversioned app-server handshakes. That keeps
 OpenClaw on the protocol surface it has been tested against.
 

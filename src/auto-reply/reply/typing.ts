@@ -14,11 +14,15 @@ export type TypingController = {
   cleanup: () => void;
 };
 
+const DEFAULT_TYPING_TTL_MS = 2 * 60_000;
+const DEFAULT_ACTIVE_TYPING_SAFETY_MS = 30 * 60_000;
+
 export function createTypingController(params: {
   onReplyStart?: () => Promise<void> | void;
   onCleanup?: () => void;
   typingIntervalSeconds?: number;
   typingTtlMs?: number;
+  activeTypingSafetyMs?: number;
   silentToken?: string;
   log?: (message: string) => void;
 }): TypingController {
@@ -26,7 +30,8 @@ export function createTypingController(params: {
     onReplyStart,
     onCleanup,
     typingIntervalSeconds = 6,
-    typingTtlMs = 2 * 60_000,
+    typingTtlMs = DEFAULT_TYPING_TTL_MS,
+    activeTypingSafetyMs = DEFAULT_ACTIVE_TYPING_SAFETY_MS,
     silentToken = SILENT_REPLY_TOKEN,
     log,
   } = params;
@@ -51,6 +56,7 @@ export function createTypingController(params: {
   // Once we stop typing, we "seal" the controller so late events can't restart typing forever.
   let sealed = false;
   let typingTtlTimer: NodeJS.Timeout | undefined;
+  let lastTypingActivityAt: number | undefined;
   const typingIntervalMs = typingIntervalSeconds * 1000;
 
   const formatTypingTtl = (ms: number) => {
@@ -65,6 +71,7 @@ export function createTypingController(params: {
     active = false;
     runComplete = false;
     dispatchIdle = false;
+    lastTypingActivityAt = undefined;
   };
 
   const cleanup = () => {
@@ -89,7 +96,7 @@ export function createTypingController(params: {
     sealed = true;
   };
 
-  const refreshTypingTtl = () => {
+  const scheduleTypingTtl = () => {
     if (sealed) {
       return;
     }
@@ -106,9 +113,34 @@ export function createTypingController(params: {
       if (!typingLoop.isRunning()) {
         return;
       }
-      log?.(`typing TTL reached (${formatTypingTtl(typingTtlMs)}); stopping typing indicator`);
+      if (!runComplete && active) {
+        const quietForMs =
+          typeof lastTypingActivityAt === "number"
+            ? Date.now() - lastTypingActivityAt
+            : typingTtlMs;
+        if (activeTypingSafetyMs <= 0 || quietForMs < activeTypingSafetyMs) {
+          log?.(
+            `typing TTL reached (${formatTypingTtl(typingTtlMs)}) while run is still active; extending typing indicator`,
+          );
+          scheduleTypingTtl();
+          return;
+        }
+        log?.(
+          `typing active-run safety limit reached (${formatTypingTtl(activeTypingSafetyMs)} without activity); stopping typing indicator`,
+        );
+      } else {
+        log?.(`typing TTL reached (${formatTypingTtl(typingTtlMs)}); stopping typing indicator`);
+      }
       cleanup();
     }, typingTtlMs);
+  };
+
+  const refreshTypingTtl = () => {
+    if (sealed) {
+      return;
+    }
+    lastTypingActivityAt = Date.now();
+    scheduleTypingTtl();
   };
 
   const isActive = () => active && !sealed;

@@ -83,6 +83,10 @@ const BASE_RELOAD_RULES: ReloadRule[] = [
     actions: ["close-memory-search-managers"],
   },
   {
+    prefix: "agents.defaults.compaction",
+    kind: "hot",
+  },
+  {
     prefix: "agents.defaults.model",
     kind: "hot",
     actions: ["restart-heartbeat"],

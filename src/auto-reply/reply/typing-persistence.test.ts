@@ -81,6 +81,73 @@ describe("typing persistence bug fix", () => {
     expect(onCleanupSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps typing past the activity TTL while the run is still active", async () => {
+    const logSpy = vi.fn();
+    const activeController = createTypingController({
+      onReplyStart: onReplyStartSpy,
+      onCleanup: onCleanupSpy,
+      typingIntervalSeconds: 1,
+      typingTtlMs: 2_000,
+      activeTypingSafetyMs: 10_000,
+      log: logSpy,
+    });
+
+    await activeController.startTypingLoop();
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(onCleanupSpy).not.toHaveBeenCalled();
+    expect(onReplyStartSpy.mock.calls.length).toBeGreaterThan(1);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("while run is still active; extending typing indicator"),
+    );
+
+    activeController.cleanup();
+  });
+
+  it("stops leaked active typing after the quiet safety limit", async () => {
+    const logSpy = vi.fn();
+    const activeController = createTypingController({
+      onReplyStart: onReplyStartSpy,
+      onCleanup: onCleanupSpy,
+      typingIntervalSeconds: 1,
+      typingTtlMs: 2_000,
+      activeTypingSafetyMs: 5_000,
+      log: logSpy,
+    });
+
+    await activeController.startTypingLoop();
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    expect(onCleanupSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("active-run safety limit reached"));
+
+    const callsAfterCleanup = onReplyStartSpy.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(onReplyStartSpy).toHaveBeenCalledTimes(callsAfterCleanup);
+  });
+
+  it("refreshes the quiet safety window on new typing activity", async () => {
+    const activeController = createTypingController({
+      onReplyStart: onReplyStartSpy,
+      onCleanup: onCleanupSpy,
+      typingIntervalSeconds: 1,
+      typingTtlMs: 2_000,
+      activeTypingSafetyMs: 5_000,
+      log: vi.fn(),
+    });
+
+    await activeController.startTypingLoop();
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(onCleanupSpy).not.toHaveBeenCalled();
+
+    activeController.refreshTypingTtl();
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(onCleanupSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(onCleanupSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("returns an inert controller when typing callbacks are absent", async () => {
     const inert = createTypingController({});
 

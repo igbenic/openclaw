@@ -15,7 +15,9 @@ Docs: https://docs.openclaw.ai
 
 ### Fixes
 
+- Agents/typing: keep Telegram and other channel typing indicators refreshing during active long-running replies instead of stopping after the internal activity watchdog, while retaining a quiet-run leak guard. Thanks @igbenic.
 - ACP/runtime: harden the opt-in Coven backend with workspace-confined launch paths, home-expanded Coven socket config, bounded socket responses, sanitized daemon output, and controlled polling failure handling. Thanks @BunsDev.
+- Agents/Codex: isolate OpenClaw-managed Codex CLI and app-server runs from user-level Codex MCP servers while preserving Codex auth, preventing global MCP helpers from being spawned by cron and one-shot agent runs. Thanks @igbenic.
 
 ## 2026.4.26
 

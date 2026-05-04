@@ -101,9 +101,40 @@ describe("Codex app-server config", () => {
         start: expect.objectContaining({
           command: "codex",
           commandSource: "managed",
+          args: ["app-server", "-c", "mcp_servers={}", "--listen", "stdio://"],
         }),
       }),
     );
+  });
+
+  it("preserves explicit app-server MCP server config overrides", () => {
+    const runtime = resolveCodexAppServerRuntimeOptions({
+      pluginConfig: {
+        appServer: {
+          args: ["app-server", "-c", 'mcp_servers={ probe = { command = "node" } }'],
+        },
+      },
+      env: {},
+    });
+
+    expect(runtime.start.args).toEqual([
+      "app-server",
+      "-c",
+      'mcp_servers={ probe = { command = "node" } }',
+    ]);
+  });
+
+  it("keeps Codex app-server MCP config available when Computer Use is enabled", () => {
+    const runtime = resolveCodexAppServerRuntimeOptions({
+      pluginConfig: {
+        computerUse: {
+          enabled: true,
+        },
+      },
+      env: {},
+    });
+
+    expect(runtime.start.args).toEqual(["app-server", "--listen", "stdio://"]);
   });
 
   it("treats configured and environment commands as explicit overrides", () => {

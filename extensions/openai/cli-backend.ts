@@ -24,6 +24,7 @@ export function buildOpenAICodexCliBackend(): CliBackendPlugin {
       command: "codex",
       args: [
         "exec",
+        "--ignore-user-config",
         "--json",
         "--color",
         "never",
@@ -36,6 +37,7 @@ export function buildOpenAICodexCliBackend(): CliBackendPlugin {
       resumeArgs: [
         "exec",
         "resume",
+        "--ignore-user-config",
         "{sessionId}",
         "-c",
         'sandbox_mode="workspace-write"',

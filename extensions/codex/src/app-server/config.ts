@@ -105,6 +105,7 @@ export const CODEX_COMPUTER_USE_CONFIG_KEYS = [
 export const DEFAULT_CODEX_COMPUTER_USE_PLUGIN_NAME = "computer-use";
 export const DEFAULT_CODEX_COMPUTER_USE_MCP_SERVER_NAME = "computer-use";
 export const DEFAULT_CODEX_COMPUTER_USE_MARKETPLACE_DISCOVERY_TIMEOUT_MS = 60_000;
+const DISABLE_USER_MCP_CONFIG_ARGS = ["-c", "mcp_servers={}"] as const;
 
 const codexAppServerTransportSchema = z.enum(["stdio", "websocket"]);
 const codexAppServerPolicyModeSchema = z.enum(["yolo", "guardian"]);
@@ -186,7 +187,13 @@ export function resolveCodexAppServerRuntimeOptions(
     : envCommand
       ? "env"
       : "managed";
-  const args = resolveArgs(config.args, env.OPENCLAW_CODEX_APP_SERVER_ARGS);
+  const computerUseConfig = resolveCodexComputerUseConfig({
+    pluginConfig: params.pluginConfig,
+    env,
+  });
+  const args = resolveArgs(config.args, env.OPENCLAW_CODEX_APP_SERVER_ARGS, {
+    disableUserMcpServers: !computerUseConfig.enabled,
+  });
   const headers = normalizeHeaders(config.headers);
   const authToken = readNonEmptyString(config.authToken);
   const url = readNonEmptyString(config.url);
@@ -395,16 +402,54 @@ function readNumberEnv(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function resolveArgs(configArgs: unknown, envArgs: string | undefined): string[] {
+function resolveArgs(
+  configArgs: unknown,
+  envArgs: string | undefined,
+  options: { disableUserMcpServers?: boolean } = {},
+): string[] {
+  const withUserMcpIsolation = (args: string[]) =>
+    options.disableUserMcpServers === true ? ensureUserMcpServersDisabled(args) : args;
+
   if (Array.isArray(configArgs)) {
-    return configArgs
-      .map((entry) => readNonEmptyString(entry))
-      .filter((entry): entry is string => entry !== undefined);
+    return withUserMcpIsolation(
+      configArgs
+        .map((entry) => readNonEmptyString(entry))
+        .filter((entry): entry is string => entry !== undefined),
+    );
   }
   if (typeof configArgs === "string") {
-    return splitShellWords(configArgs);
+    return withUserMcpIsolation(splitShellWords(configArgs));
   }
-  return splitShellWords(envArgs ?? "");
+  return withUserMcpIsolation(splitShellWords(envArgs ?? ""));
+}
+
+function ensureUserMcpServersDisabled(args: string[]): string[] {
+  const normalizedArgs = args.length > 0 ? args : ["app-server", "--listen", "stdio://"];
+  if (hasMcpServersConfigOverride(normalizedArgs)) {
+    return normalizedArgs;
+  }
+  if (normalizedArgs[0] !== "app-server") {
+    return normalizedArgs;
+  }
+  return [normalizedArgs[0], ...DISABLE_USER_MCP_CONFIG_ARGS, ...normalizedArgs.slice(1)];
+}
+
+function hasMcpServersConfigOverride(args: string[]): boolean {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg !== "-c" && arg !== "--config") {
+      continue;
+    }
+    const value = args[index + 1]?.trim() ?? "";
+    if (
+      value === "mcp_servers" ||
+      value.startsWith("mcp_servers=") ||
+      value.startsWith("mcp_servers.")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function readNonEmptyString(value: unknown): string | undefined {

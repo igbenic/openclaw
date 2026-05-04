@@ -584,6 +584,18 @@ export class AcpSessionManager {
         meta: resolvedMeta,
       });
       const inferredPatch = inferRuntimeOptionPatchFromConfigOption(key, value);
+      if (Object.hasOwn(inferredPatch, "timeoutSeconds")) {
+        const nextOptions = mergeRuntimeOptions({
+          current: resolveRuntimeOptionsFromMeta(meta),
+          patch: inferredPatch,
+        });
+        await this.persistRuntimeOptions({
+          cfg: params.cfg,
+          sessionKey,
+          options: nextOptions,
+        });
+        return nextOptions;
+      }
       const capabilities = await this.resolveRuntimeCapabilities({ runtime, handle });
       if (
         !capabilities.controls.includes("session/set_config_option") ||

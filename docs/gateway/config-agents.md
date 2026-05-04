@@ -663,6 +663,9 @@ See [Streaming](/concepts/streaming) for behavior + chunking details.
 
 - Defaults: `instant` for direct chats/mentions, `message` for unmentioned group chats.
 - Per-session overrides: `session.typingMode`, `session.typingIntervalSeconds`.
+- Active long-running replies continue refreshing typing until they finish or
+  fail. OpenClaw still applies an internal leak guard for loops that remain
+  active without new run activity for an extended period.
 
 See [Typing Indicators](/concepts/typing-indicators).
 

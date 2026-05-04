@@ -261,6 +261,20 @@ describe("buildGatewayReloadPlan", () => {
     expect(plan.noopPaths).toEqual([]);
   });
 
+  it("hot-reloads compaction runtime settings without restart", () => {
+    const plan = buildGatewayReloadPlan([
+      "agents.defaults.compaction.truncateAfterCompaction",
+      "agents.defaults.compaction.maxActiveTranscriptBytes",
+    ]);
+
+    expect(plan.restartGateway).toBe(false);
+    expect(plan.hotReasons).toEqual([
+      "agents.defaults.compaction.truncateAfterCompaction",
+      "agents.defaults.compaction.maxActiveTranscriptBytes",
+    ]);
+    expect(plan.noopPaths).toEqual([]);
+  });
+
   it("treats plugin install timestamp-only changes as no-op", () => {
     const plan = buildGatewayReloadPlan([
       "plugins.installs.lossless-claw.resolvedAt",

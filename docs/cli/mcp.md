@@ -65,6 +65,7 @@ Use [`openclaw acp`](/cli/acp) instead when OpenClaw should host the coding runt
     - one-shot agent entry points such as `openclaw agent` and `openclaw infer model run` retire any bundled MCP runtimes they open when the reply completes, so repeated scripted runs do not accumulate stdio MCP child processes
     - stdio MCP servers launched by OpenClaw (bundled or user-configured) are torn down as a process tree on shutdown, so child subprocesses started by the server do not survive after the parent stdio client exits
     - deleting or resetting a session disposes that session's MCP clients through the shared runtime cleanup path, so there are no lingering stdio connections tied to a removed session
+    - OpenClaw-managed Codex CLI bundle-MCP runs pass Codex's `--ignore-user-config` flag, and the managed Codex app-server starts with `-c mcp_servers={}` by default, so Codex auth remains available but user-level Codex MCP servers are not inherited into cron, one-shot agent, app-server, or fallback CLI runs
   </Accordion>
 </AccordionGroup>
 
